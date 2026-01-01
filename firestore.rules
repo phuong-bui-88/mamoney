@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth.uid == $uid",
+        ".write": "auth.uid == $uid"
+      }
+    },
+    "transactions": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$docId": {
+        ".read": "auth != null && root.child('transactions').child($docId).child('userId').val() == auth.uid",
+        ".write": "auth != null && root.child('transactions').child($docId).child('userId').val() == auth.uid"
+      }
+    }
+  }
+}

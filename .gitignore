@@ -1,0 +1,82 @@
+# Miscellaneous
+.DS_Store
+.AppleDouble
+.LSOverride
+*.local
+*.swp
+*.swo
+*~
+
+# Flutter/Dart build
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/pubspec.lock
+*.iml
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Android
+android/local.properties
+android/GeneratedPluginRegistrant.java
+android/gradlew
+android/gradlew.bat
+android/.gradle/
+android/app/debug
+android/app/profile
+android/app/release
+
+# iOS
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner.xcworkspace/xcshareddata/IDEWindowStateManagement.plist
+
+# Web
+web/canvaskit/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Generated files
+.env.local
+.env.*.local
+
+# Firebase configuration
+lib/services/firebase_config.dart
+
+# Firebase emulator
+firebase-debug.log
+
+# Secrets
+*.pem
+*.key
+.env
+.env.local
+secrets.json
+google-services.json
+GoogleService-Info.plist
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Editor
+*.code-workspace
+
+# Docker
+.dockerignore

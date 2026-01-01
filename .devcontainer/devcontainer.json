@@ -20,16 +20,18 @@
         "dart.flutterSdkPath": "/usr/local/flutter",
         "dart.triggerSignatureHelpAutomatically": true,
         "editor.formatOnSave": true,
-        "editor.defaultFormatter": "Dart-Code.dart-code",
         "[dart]": {
-          "editor.defaultFormatter": "Dart-Code.dart-code",
+          "editor.defaultFormatter": null,
           "editor.formatOnSave": true
         }
       }
     }
   },
   "remoteUser": "root",
-  "forwardPorts": [8080, 5037],
+  "forwardPorts": [
+    8080,
+    5037
+  ],
   "portsAttributes": {
     "8080": {
       "label": "Flutter Web App",
@@ -40,5 +42,5 @@
       "onAutoForward": "silent"
     }
   },
-  "postCreateCommand": "git init && git config user.email 'dev@mamoney.local' && git config user.name 'Developer' && git add . && git commit -m 'Initial commit' --allow-empty && flutter pub get"
+  "postCreateCommand": "flutter --version && flutter pub get && flutter doctor && flutter build web"
 }

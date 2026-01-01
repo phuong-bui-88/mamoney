@@ -40,9 +40,9 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                     Expanded(
                       child: SegmentedButton<String>(
                         segments: const [
-                          ButtonSegment(label: Text('All')),
-                          ButtonSegment(label: Text('Income')),
-                          ButtonSegment(label: Text('Expense')),
+                          ButtonSegment(value: 'All', label: Text('All')),
+                          ButtonSegment(value: 'Income', label: Text('Income')),
+                          ButtonSegment(value: 'Expense', label: Text('Expense')),
                         ],
                         selected: {_filterType},
                         onSelectionChanged: (Set<String> newSelection) {

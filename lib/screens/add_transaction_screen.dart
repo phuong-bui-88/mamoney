@@ -5,7 +5,7 @@ import 'package:mamoney/services/transaction_provider.dart';
 import 'package:intl/intl.dart';
 
 class AddTransactionScreen extends StatefulWidget {
-  const AddTransactionScreen({Key? key}) : super(key: key);
+  const AddTransactionScreen({super.key});
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();

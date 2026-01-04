@@ -13,15 +13,13 @@ class TransactionProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  double get totalIncome =>
-      _transactions
-          .where((t) => t.type == TransactionType.income)
-          .fold(0, (sum, t) => sum + t.amount);
+  double get totalIncome => _transactions
+      .where((t) => t.type == TransactionType.income)
+      .fold(0, (sum, t) => sum + t.amount);
 
-  double get totalExpense =>
-      _transactions
-          .where((t) => t.type == TransactionType.expense)
-          .fold(0, (sum, t) => sum + t.amount);
+  double get totalExpense => _transactions
+      .where((t) => t.type == TransactionType.expense)
+      .fold(0, (sum, t) => sum + t.amount);
 
   double get balance => totalIncome - totalExpense;
 
@@ -29,8 +27,9 @@ class TransactionProvider extends ChangeNotifier {
     _initializeTransactionStream();
   }
 
-  void _initializeTransactionStream() {
-    _firebaseService.getTransactionsStream().listen((transactions) {
+  void _initializeTransactionStream() async {
+    final transactionStream = _firebaseService.getTransactionsStream();
+    transactionStream.listen((transactions) {
       _transactions = transactions;
       notifyListeners();
     });

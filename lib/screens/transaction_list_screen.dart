@@ -4,7 +4,7 @@ import 'package:mamoney/services/transaction_provider.dart';
 import 'package:intl/intl.dart';
 
 class TransactionListScreen extends StatefulWidget {
-  const TransactionListScreen({Key? key}) : super(key: key);
+  const TransactionListScreen({super.key});
 
   @override
   State<TransactionListScreen> createState() => _TransactionListScreenState();
@@ -42,7 +42,8 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                         segments: const [
                           ButtonSegment(value: 'All', label: Text('All')),
                           ButtonSegment(value: 'Income', label: Text('Income')),
-                          ButtonSegment(value: 'Expense', label: Text('Expense')),
+                          ButtonSegment(
+                              value: 'Expense', label: Text('Expense')),
                         ],
                         selected: {_filterType},
                         onSelectionChanged: (Set<String> newSelection) {
@@ -104,9 +105,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                             },
                             child: ListTile(
                               leading: Icon(
-                                transaction.type
-                                        .toString()
-                                        .contains('income')
+                                transaction.type.toString().contains('income')
                                     ? Icons.arrow_downward
                                     : Icons.arrow_upward,
                                 color: transaction.type

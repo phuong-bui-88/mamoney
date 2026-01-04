@@ -7,7 +7,7 @@ import 'package:mamoney/screens/add_transaction_screen.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -188,20 +188,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: transactionProvider.transactions.length >
-                                    5
-                                ? 5
-                                : transactionProvider.transactions.length,
+                            itemCount:
+                                transactionProvider.transactions.length > 5
+                                    ? 5
+                                    : transactionProvider.transactions.length,
                             itemBuilder: (context, index) {
-                              final transaction = transactionProvider
-                                  .transactions[index];
+                              final transaction =
+                                  transactionProvider.transactions[index];
                               return ListTile(
                                 leading: Icon(
                                   transaction.type.toString().contains('income')
                                       ? Icons.arrow_downward
                                       : Icons.arrow_upward,
-                                  color: transaction.type.toString().contains(
-                                          'income')
+                                  color: transaction.type
+                                          .toString()
+                                          .contains('income')
                                       ? Colors.green
                                       : Colors.red,
                                 ),

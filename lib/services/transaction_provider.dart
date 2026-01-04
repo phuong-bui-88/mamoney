@@ -41,7 +41,13 @@ class TransactionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _firebaseService.addTransaction(transaction);
+      final id = await _firebaseService.addTransaction(transaction);
+      // Optimistically add the transaction locally so UI updates immediately
+      final createdTransaction = transaction.copyWith(
+        id: id,
+        userId: _firebaseService.currentUser?.uid,
+      );
+      _transactions.insert(0, createdTransaction);
     } catch (e) {
       _error = e.toString();
     } finally {

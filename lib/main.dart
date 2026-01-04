@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:mamoney/firebase_options.dart';
 import 'package:mamoney/services/auth_provider.dart';
+import 'package:mamoney/services/transaction_provider.dart';
 import 'package:mamoney/screens/login_screen.dart';
 import 'package:mamoney/screens/home_screen.dart';
 
@@ -32,6 +33,9 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider<AuthProvider>(
           create: (_) => AuthProvider(),
+        ),
+        ChangeNotifierProvider<TransactionProvider>(
+          create: (_) => TransactionProvider(),
         ),
       ],
       child: MaterialApp(

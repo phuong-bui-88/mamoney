@@ -29,16 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: MultiProvider(
-        providers: [
-          ChangeNotifierProvider<TransactionProvider>(
-            create: (_) => TransactionProvider(),
-          ),
-        ],
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
               children: [
                 Consumer<TransactionProvider>(
                   builder: (context, transactionProvider, _) {
@@ -233,7 +227,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(

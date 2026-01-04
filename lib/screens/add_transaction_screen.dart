@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/services/transaction_provider.dart';
+import 'package:mamoney/services/auth_provider.dart';
+import 'package:mamoney/services/firebase_service.dart';
 import 'package:intl/intl.dart';
 
 class AddTransactionScreen extends StatefulWidget {
@@ -42,7 +44,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     super.dispose();
   }
 
-  void _handleAddTransaction() {
+  Future<void> _handleAddTransaction() async {
     final description = _descriptionController.text.trim();
     final amountStr = _amountController.text.trim();
 
@@ -61,9 +63,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return;
     }
 
+    // Ensure user is signed in
+    final uid = FirebaseService().currentUser?.uid;
+    if (uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to add a transaction')),
+      );
+      return;
+    }
+
     final transaction = Transaction(
       id: '',
-      userId: '',
+      userId: uid,
       description: description,
       amount: amount,
       type: _selectedType,
@@ -72,7 +83,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       createdAt: DateTime.now(),
     );
 
-    context.read<TransactionProvider>().addTransaction(transaction);
+    final provider = context.read<TransactionProvider>();
+    await provider.addTransaction(transaction);
+
+    if (provider.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add transaction: ${provider.error}')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Transaction added')),
+    );
     Navigator.pop(context);
   }
 
@@ -89,6 +113,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Transaction'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              context.read<AuthProvider>().signOut();
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(

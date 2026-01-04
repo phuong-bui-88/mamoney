@@ -16,6 +16,12 @@ RUN apt-get update && apt-get install -y \
     zip \
     ca-certificates \
     openjdk-17-jdk \
+    clang \
+    cmake \
+    ninja-build \
+    pkg-config \
+    libgtk-3-dev \
+    liblzma-dev \
     libglu1-mesa \
     libxi6 \
     libgconf-2-4 \

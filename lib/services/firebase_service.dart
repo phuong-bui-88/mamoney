@@ -74,7 +74,12 @@ class FirebaseService {
   Future<String> addTransaction(models.Transaction transaction) async {
     try {
       final id = const Uuid().v4();
-      final transactionWithId = transaction.copyWith(id: id);
+      final uid = _firebaseAuth.currentUser?.uid;
+      if (uid == null) {
+        throw Exception('User not authenticated');
+      }
+      final transactionWithId =
+          transaction.copyWith(id: id, userId: uid);
       
       await _firestore
           .collection('transactions')

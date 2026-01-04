@@ -30,9 +30,40 @@ Before you can run this app, you need to:
 3. Choose location (select one close to your region)
 4. Start in **Production mode**
 5. Click **Create**
-6. Go to **Rules** tab and replace content with the content from `firestore.rules` file in this project
 
-## Step 4: Get Firebase Configuration
+## Step 4: Update Firestore Security Rules
+
+The updated Firestore rules are designed to automatically create user documents when users sign up:
+
+1. Go to **Firestore Database** → **Rules** tab
+2. Replace the entire content with this:
+
+```firestore
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to create their own user document during signup
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId && request.auth.uid == userId;
+      allow update: if request.auth.uid == userId;
+      allow delete: if request.auth.uid == userId;
+    }
+    
+    // Allow users to read and write their own transactions
+    match /transactions/{transactionId} {
+      allow read: if request.auth.uid == resource.data.userId;
+      allow create: if request.auth.uid == request.resource.data.userId;
+      allow update: if request.auth.uid == resource.data.userId;
+      allow delete: if request.auth.uid == resource.data.userId;
+    }
+  }
+}
+```
+
+3. Click **Publish** to apply the rules
+
+## Step 5: Get Firebase Configuration
 
 1. Go to **Project Settings** (gear icon, top right)
 2. Under "Your apps", select the Web app (or create one if not exists)
@@ -52,48 +83,88 @@ Example of what you'll see:
 }
 ```
 
-## Step 5: Update main.dart
+## Step 6: How User Data Gets Created
 
-Open `lib/main.dart` and update the Firebase initialization (you'll need to do this after getting your config):
+When a user **signs up**:
+1. The app creates an account in Firebase Authentication
+2. A user document is automatically created in Firestore with:
+   - `id`: The user's unique ID
+   - `email`: The user's email address
+   - `displayName`: Extracted from the email (part before @)
+   - `createdAt`: The signup timestamp
 
-```dart
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: FirebaseConfig.firebaseOptions,
-  );
-  runApp(const MyApp());
-}
-```
+When a user **signs in**:
+1. The app verifies the credentials in Firebase Authentication
+2. The app checks if a user document exists in Firestore
+3. If missing (shouldn't happen), it creates one automatically
 
-## Step 6: Test the Application
+## Step 7: Test the Application
 
 1. Run `flutter pub get` to install dependencies
 2. Run `flutter run` to start the app
-3. Create a test account and add some transactions
-4. Verify data appears in Firestore Database
+3. **Create a test account** and verify:
+   - You can sign up successfully
+   - Go to Firebase Console → Firestore Database → **Collections** tab
+   - You should see a `users` collection
+   - Click into it and verify your user document is there
+4. **Add some transactions** and verify:
+   - You should see a `transactions` collection created
+   - Your transactions should be visible there
 
 ## Firestore Database Structure
 
 ```
 users/
   {userId}/
-    id: string
-    email: string
-    displayName: string
-    createdAt: timestamp
+    id: string (unique user ID)
+    email: string (user's email)
+    displayName: string (extracted from email)
+    createdAt: timestamp (signup time)
 
 transactions/
   {transactionId}/
-    id: string
-    userId: string
-    description: string
-    amount: number
+    id: string (unique transaction ID)
+    userId: string (which user owns it)
+    description: string (what the transaction is for)
+    amount: number (how much)
     type: "income" | "expense"
-    category: string
-    date: timestamp
-    createdAt: timestamp
+    category: string (category of transaction)
+    date: timestamp (when it happened)
+    createdAt: timestamp (when it was added)
 ```
+
+## Troubleshooting
+
+### Users not appearing in Firestore after signup
+
+**Check these:**
+1. **Go to Firebase Console** → Firestore Database
+2. Click **Collections** tab - do you see a `users` collection?
+3. If yes, expand it - do you see documents?
+4. If no documents appear:
+   - Check the browser console for errors (F12 → Console)
+   - Check Firestore Rules tab - are they correctly applied?
+   - Verify Firebase is initialized with correct API keys
+
+### Signup/Signin fails
+
+1. Go to Firebase Console → Authentication → Users tab
+2. Check if users are being created there
+3. If users exist in Authentication but not in Firestore:
+   - Check the Firestore Rules tab
+   - Make sure rules match the format above (NOT Realtime Database format)
+   - Click **Publish** after updating rules
+
+### Data only in local storage, not in Firestore
+
+This happens when Firebase isn't properly initialized:
+1. Verify your Firebase config in `lib/services/firebase_config.dart` matches your project
+2. Check that all required fields are filled:
+   - `apiKey`
+   - `projectId`
+   - `appId`
+   - `authDomain`
+   - `messagingSenderId`
 
 ## Security Rules Explanation
 

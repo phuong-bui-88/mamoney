@@ -15,6 +15,10 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
 
   AuthProvider() {
+    _initializeAuthState();
+  }
+
+  Future<void> _initializeAuthState() async {
     _firebaseService.authStateChanges.listen((auth.User? user) {
       _user = user;
       notifyListeners();

@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-0 \
     libgdk-pixbuf2.0-0 \
     chromium-browser \
+    zsh \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Android SDK
@@ -61,11 +62,25 @@ RUN mkdir -p $FLUTTER_HOME && \
 # Create pub cache directory
 RUN mkdir -p $PUB_CACHE
 
+# Create a non-root user
+RUN useradd -m -u 1000 flutteruser && \
+    chown -R flutteruser:flutteruser /usr/local/flutter && \
+    chown -R flutteruser:flutteruser /opt/android-sdk && \
+    chown -R flutteruser:flutteruser $PUB_CACHE && \
+    chsh -s /bin/zsh flutteruser
+
+# Install Oh-My-Zsh for flutteruser
+RUN su flutteruser -c 'sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended' && \
+    sed -i 's/^ZSH_THEME=.*/ZSH_THEME="robbyrussell"/' /home/flutteruser/.zshrc
+
+# Configure git safe directory for flutteruser
+RUN su flutteruser -c "git config --global --add safe.directory /usr/local/flutter"
+
 # Set working directory
 WORKDIR /workspace
 
 # Verify Flutter installation
-RUN flutter --version
+RUN su flutteruser -c "/usr/local/flutter/bin/flutter --version"
 
-# Default command
-CMD ["/bin/bash"]
+# Default command - use exec form with zsh for the user
+CMD ["/bin/zsh"]

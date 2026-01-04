@@ -13,7 +13,8 @@
         "Dart-Code.flutter",
         "ms-vscode.cpptools",
         "esbenp.prettier-vscode",
-        "DBSonder.more-flutter-snippets"
+        "DBSonder.more-flutter-snippets",
+        "GitHub.copilot-chat"
       ],
       "settings": {
         "dart.sdk": "/usr/local/flutter/bin/cache/dart-sdk",
@@ -27,7 +28,7 @@
       }
     }
   },
-  "remoteUser": "root",
+  "remoteUser": "flutteruser",
   "forwardPorts": [
     8080,
     5037

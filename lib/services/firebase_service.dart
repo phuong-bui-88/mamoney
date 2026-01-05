@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
+  static bool _isInitialized = false;
 
   factory FirebaseService() {
     return _instance;
@@ -13,17 +14,44 @@ class FirebaseService {
 
   FirebaseService._internal();
 
-  final auth.FirebaseAuth _firebaseAuth = auth.FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late final auth.FirebaseAuth _firebaseAuth;
+  late final FirebaseFirestore _firestore;
+
+  bool get isInitialized => _isInitialized;
+
+  void initialize() {
+    if (!_isInitialized) {
+      try {
+        _firebaseAuth = auth.FirebaseAuth.instance;
+        _firestore = FirebaseFirestore.instance;
+        _isInitialized = true;
+      } catch (e) {
+        print('Firebase initialization failed: $e');
+      }
+    }
+  }
 
   // Auth Stream
-  Stream<auth.User?> get authStateChanges => _firebaseAuth.authStateChanges();
+  Stream<auth.User?> get authStateChanges {
+    if (!_isInitialized) {
+      return Stream.value(null);
+    }
+    return _firebaseAuth.authStateChanges();
+  }
 
   // Get current user
-  auth.User? get currentUser => _firebaseAuth.currentUser;
+  auth.User? get currentUser {
+    if (!_isInitialized) {
+      return null;
+    }
+    return _firebaseAuth.currentUser;
+  }
 
   // Sign up with email and password
   Future<auth.User?> signUp(String email, String password) async {
+    if (!_isInitialized) {
+      throw Exception('Firebase is not initialized');
+    }
     try {
       final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
         email: email,
@@ -50,6 +78,9 @@ class FirebaseService {
 
   // Sign in with email and password
   Future<auth.User?> signIn(String email, String password) async {
+    if (!_isInitialized) {
+      throw Exception('Firebase is not initialized');
+    }
     try {
       final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
@@ -63,6 +94,9 @@ class FirebaseService {
 
   // Sign out
   Future<void> signOut() async {
+    if (!_isInitialized) {
+      return;
+    }
     try {
       await _firebaseAuth.signOut();
     } catch (e) {
@@ -72,6 +106,9 @@ class FirebaseService {
 
   // Add transaction
   Future<String> addTransaction(models.Transaction transaction) async {
+    if (!_isInitialized) {
+      throw Exception('Firebase is not initialized');
+    }
     try {
       final id = const Uuid().v4();
       final uid = _firebaseAuth.currentUser?.uid;
@@ -112,6 +149,9 @@ class FirebaseService {
 
   // Delete transaction
   Future<void> deleteTransaction(String transactionId) async {
+    if (!_isInitialized) {
+      return;
+    }
     try {
       await _firestore.collection('transactions').doc(transactionId).delete();
     } catch (e) {
@@ -121,6 +161,9 @@ class FirebaseService {
 
   // Update transaction
   Future<void> updateTransaction(models.Transaction transaction) async {
+    if (!_isInitialized) {
+      return;
+    }
     try {
       await _firestore
           .collection('transactions')
@@ -133,6 +176,9 @@ class FirebaseService {
 
   // Get user data
   Future<User?> getUserData(String userId) async {
+    if (!_isInitialized) {
+      return null;
+    }
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
       if (doc.exists) {

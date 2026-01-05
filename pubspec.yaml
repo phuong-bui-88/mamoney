@@ -23,6 +23,9 @@ dependencies:
   # UI
   intl: ^0.20.2
   
+  # AI
+  http: ^1.1.0
+  
   # Utilities
   get_it: ^9.2.0
   uuid: ^4.0.0

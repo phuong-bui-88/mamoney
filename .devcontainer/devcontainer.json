@@ -3,6 +3,7 @@
   "dockerComposeFile": "../docker-compose.yml",
   "service": "flutter-dev",
   "workspaceFolder": "/workspace",
+  "remoteUser": "flutteruser",
   "features": {
     "ghcr.io/devcontainers/features/git:1": {}
   },
@@ -14,34 +15,20 @@
         "ms-vscode.cpptools",
         "esbenp.prettier-vscode",
         "DBSonder.more-flutter-snippets",
-        "GitHub.copilot-chat"
+        "GitHub.copilot"
       ],
       "settings": {
         "dart.sdk": "/usr/local/flutter/bin/cache/dart-sdk",
         "dart.flutterSdkPath": "/usr/local/flutter",
-        "dart.triggerSignatureHelpAutomatically": true,
-        "editor.formatOnSave": true,
-        "[dart]": {
-          "editor.defaultFormatter": null,
-          "editor.formatOnSave": true
-        }
+        "editor.formatOnSave": true
       }
     }
   },
-  "remoteUser": "flutteruser",
-  "forwardPorts": [
-    8080,
-    5037
-  ],
   "portsAttributes": {
     "8080": {
       "label": "Flutter Web App",
       "onAutoForward": "notify"
-    },
-    "5037": {
-      "label": "ADB Daemon",
-      "onAutoForward": "silent"
     }
   },
-  "postCreateCommand": "flutter --version && flutter pub get && flutter doctor && flutter build web"
+  "postCreateCommand": "flutter doctor"
 }

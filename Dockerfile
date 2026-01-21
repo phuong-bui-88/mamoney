@@ -86,7 +86,10 @@ RUN useradd -m -u 1000 flutteruser && \
     chsh -s /bin/zsh flutteruser && \
     mkdir -p /home/flutteruser/.android && \
     echo "count=0" > /home/flutteruser/.android/repositories.cfg && \
-    chown -R flutteruser:flutteruser /home/flutteruser/.android
+    chown -R flutteruser:flutteruser /home/flutteruser/.android && \
+    mkdir -p /home/flutteruser/.flutter && \
+    echo '{"android-sdk": "/opt/android-sdk"}' > /home/flutteruser/.flutter-settings && \
+    chown -R flutteruser:flutteruser /home/flutteruser/.flutter
 
 # Install Oh-My-Zsh for flutteruser with proper PATH setup to prevent utility lookup errors
 RUN export PATH="/bin:/usr/bin:/usr/local/bin:/usr/sbin:/sbin" && \

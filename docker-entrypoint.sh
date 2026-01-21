@@ -12,11 +12,12 @@ echo "ADB bridge started (PID: $SOCAT_PID)"
 sleep 2
 
 # Accept Android SDK licenses on startup
-echo "Accepting Android SDK licenses..."
+echo "Configuring Android SDK licenses..."
 yes | /opt/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=/opt/android-sdk --licenses 2>&1 | tail -1
 
 # Export for child processes
 export SOCAT_PID
+export ANDROID_LICENSES=1
 
 # Execute the main command
 exec "$@"

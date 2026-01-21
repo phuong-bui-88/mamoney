@@ -89,7 +89,10 @@ RUN useradd -m -u 1000 flutteruser && \
     chown -R flutteruser:flutteruser /home/flutteruser/.android && \
     mkdir -p /home/flutteruser/.flutter && \
     echo '{"android-sdk": "/opt/android-sdk"}' > /home/flutteruser/.flutter-settings && \
-    chown -R flutteruser:flutteruser /home/flutteruser/.flutter
+    chown -R flutteruser:flutteruser /home/flutteruser/.flutter && \
+    mkdir -p /home/flutteruser/.gradle && \
+    echo 'org.gradle.jvmargs=-Xmx4096m' > /home/flutteruser/.gradle/gradle.properties && \
+    chown -R flutteruser:flutteruser /home/flutteruser/.gradle
 
 # Install Oh-My-Zsh for flutteruser with proper PATH setup to prevent utility lookup errors
 RUN export PATH="/bin:/usr/bin:/usr/local/bin:/usr/sbin:/sbin" && \
@@ -117,8 +120,9 @@ RUN git config --global --add safe.directory /usr/local/flutter && \
 
 # Copy entrypoint script if needed
 COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
-    chown flutteruser:flutteruser /usr/local/bin/docker-entrypoint.sh
+COPY flutter-doctor-wrapper.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/flutter-doctor-wrapper.sh && \
+    chown flutteruser:flutteruser /usr/local/bin/docker-entrypoint.sh /usr/local/bin/flutter-doctor-wrapper.sh
 
 # Set working directory
 WORKDIR /workspace

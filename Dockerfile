@@ -153,6 +153,12 @@ WORKDIR /workspace
 # Verify Flutter installation
 RUN su flutteruser -c "$FLUTTER_HOME/bin/flutter --version" || echo "Warning: Flutter verification skipped"
 
+# Install Flutter wrapper to handle Android license acceptance
+RUN mv /usr/local/flutter/bin/flutter /usr/local/flutter/bin/flutter.real 2>/dev/null || true && \
+    cp /usr/local/bin/flutter-doctor-wrapper.sh /usr/local/flutter/bin/flutter && \
+    chmod +x /usr/local/flutter/bin/flutter && \
+    chown flutteruser:flutteruser /usr/local/flutter/bin/flutter*
+
 # Entrypoint for ADB bridge
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 

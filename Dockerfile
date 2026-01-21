@@ -124,7 +124,9 @@ COPY flutter-doctor-wrapper.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/flutter-doctor-wrapper.sh && \
     chown flutteruser:flutteruser /usr/local/bin/docker-entrypoint.sh /usr/local/bin/flutter-doctor-wrapper.sh && \
     ln -sf /opt/android-sdk/cmdline-tools/bin/sdkmanager /usr/local/bin/sdkmanager && \
-    ln -sf /opt/android-sdk/cmdline-tools/bin/sdkmanager /usr/bin/sdkmanager
+    ln -sf /opt/android-sdk/cmdline-tools/bin/sdkmanager /usr/bin/sdkmanager && \
+    ln -sf /opt/android-sdk/platform-tools/adb /usr/local/bin/adb && \
+    ln -sf /opt/android-sdk/platform-tools/adb /usr/bin/adb
 
 # Pre-accept all licenses for flutter doctor
 RUN echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > /opt/android-sdk/licenses/android-sdk-license && \

@@ -1,0 +1,20 @@
+workflows:
+  ios-debug-ipa:
+    name: iOS Debug IPA (AltStore)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      xcode: latest
+
+    scripts:
+      - name: Flutter pub get
+        script: flutter pub get
+
+      - name: Build iOS IPA (debug)
+        script: |
+          flutter build ipa --debug
+
+    artifacts:
+      - build/ios/ipa/*.ipa

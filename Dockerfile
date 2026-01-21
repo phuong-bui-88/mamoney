@@ -62,6 +62,7 @@ RUN mkdir -p $ANDROID_HOME/licenses && \
     yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME \
     "platforms;android-34" \
     "platforms;android-36" \
+    "build-tools;35.0.0" \
     "build-tools;34.0.0" \
     "build-tools;28.0.3" \
     "platform-tools" 2>&1 | grep -E "^(Installing|Installed)" || true && \

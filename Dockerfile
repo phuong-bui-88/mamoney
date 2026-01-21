@@ -135,17 +135,9 @@ RUN echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > /opt/android-sdk/licenses/
     chown -R flutteruser:flutteruser /opt/android-sdk/licenses
 
 # Create initialization script that pre-accepts licenses on startup
-RUN mkdir -p /etc/init.d && cat > /etc/profile.d/android-init.sh << 'ANDROID_INIT'
-#!/bin/bash
-# Pre-accept Android licenses on any shell startup
-if [ -z "$ANDROID_LICENSES_INITIALIZED" ]; then
-    export ANDROID_LICENSES_INITIALIZED=1
-    export ANDROID_HOME=/opt/android-sdk
-    export ANDROID_SDK_ROOT=/opt/android-sdk
-    yes 2>/dev/null | /opt/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=/opt/android-sdk --licenses >/dev/null 2>&1 || true
-fi
-ANDROID_INIT
-chmod +x /etc/profile.d/android-init.sh
+RUN mkdir -p /etc/profile.d && \
+    printf '#!/bin/bash\n# Pre-accept Android licenses on any shell startup\nif [ -z "$ANDROID_LICENSES_INITIALIZED" ]; then\n    export ANDROID_LICENSES_INITIALIZED=1\n    export ANDROID_HOME=/opt/android-sdk\n    export ANDROID_SDK_ROOT=/opt/android-sdk\n    yes 2>/dev/null | /opt/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=/opt/android-sdk --licenses >/dev/null 2>&1 || true\nfi\n' > /etc/profile.d/android-init.sh && \
+    chmod +x /etc/profile.d/android-init.sh
 
 # Set working directory
 WORKDIR /workspace

@@ -6,16 +6,15 @@ services:
     container_name: mamoney-dev
     environment:
       - FLUTTER_HOME=/usr/local/flutter
-      - PUB_CACHE=/pub-cache
+      - PUB_CACHE=/workspace/.pub-cache
       - ANDROID_HOME=/opt/android-sdk
       - TERM=xterm-256color
-      - ADB_SERVER_SOCKET=tcp:127.0.0.1:5037
-      - ADB_HOST=127.0.0.1
+      - ADB_SERVER_SOCKET=tcp:host.docker.internal:5037
+      - ADB_HOST=host.docker.internal
       - ADB_PORT=5037
       - PATH=/usr/local/flutter/bin:/opt/apache-maven-3.9.11/bin:$PATH
     volumes:
       - .:/workspace
-      - pub-cache:/pub-cache
       - android-sdk:/opt/android-sdk
       - ~/.android:/home/flutteruser/.android
     working_dir: /workspace
@@ -29,9 +28,9 @@ services:
     ports:
       - "5037:5037"
       - "8081:8080"
+      - "55555:55555"
 
 volumes:
-  pub-cache:
   android-sdk:
 
 networks:

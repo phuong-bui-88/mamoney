@@ -66,7 +66,9 @@ RUN mkdir -p $ANDROID_HOME/licenses && \
     "build-tools;28.0.3" \
     "platform-tools" 2>&1 | grep -E "^(Installing|Installed)" || true && \
     yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses 2>&1 | tail -1 && \
-    chmod -R 777 $ANDROID_HOME
+    chmod -R 777 $ANDROID_HOME && \
+    mkdir -p ~/.android && \
+    echo "count=0" > ~/.android/repositories.cfg
 
 # Install Flutter (stable)
 RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_HOME && \
@@ -81,7 +83,10 @@ ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8
 # Create non-root user
 RUN useradd -m -u 1000 flutteruser && \
     chown -R flutteruser:flutteruser /usr/local/flutter /opt/android-sdk && \
-    chsh -s /bin/zsh flutteruser
+    chsh -s /bin/zsh flutteruser && \
+    mkdir -p /home/flutteruser/.android && \
+    echo "count=0" > /home/flutteruser/.android/repositories.cfg && \
+    chown -R flutteruser:flutteruser /home/flutteruser/.android
 
 # Install Oh-My-Zsh for flutteruser with proper PATH setup to prevent utility lookup errors
 RUN export PATH="/bin:/usr/bin:/usr/local/bin:/usr/sbin:/sbin" && \

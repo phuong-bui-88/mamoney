@@ -1,0 +1,23 @@
+Launching lib/main.dart on sdk gphone64 x86 64 in debug mode...
+Running Gradle task 'assembleDebug'...                          
+/workspace/android/app/src/main/AndroidManifest.xml:6:9-42 Error:
+	Attribute application@name at AndroidManifest.xml:6:9-42 requires a placeholder substitution but no value for <applicationName> is provided.
+/workspace/android/app/src/debug/AndroidManifest.xml Error:
+	Validation failed, exiting
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:processDebugMainManifest'.
+> Manifest merger failed with multiple errors, see logs
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+
+* Get more help at https://help.gradle.org
+
+BUILD FAILED in 5s
+Running Gradle task 'assembleDebug'...                              5.8s
+Error: Gradle task assembleDebug failed with exit code 1

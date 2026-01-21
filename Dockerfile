@@ -65,6 +65,7 @@ RUN mkdir -p $ANDROID_HOME/licenses && \
     "build-tools;34.0.0" \
     "build-tools;28.0.3" \
     "platform-tools" 2>&1 | grep -E "^(Installing|Installed)" || true && \
+    yes | $ANDROID_HOME/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses 2>&1 | tail -1 && \
     chmod -R 777 $ANDROID_HOME
 
 # Install Flutter (stable)

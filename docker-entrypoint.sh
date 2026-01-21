@@ -11,9 +11,14 @@ echo "ADB bridge started (PID: $SOCAT_PID)"
 # Give socat a moment to start
 sleep 2
 
-# Accept Android SDK licenses on startup
-echo "Configuring Android SDK licenses..."
-yes | /opt/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=/opt/android-sdk --licenses 2>&1 | tail -1
+# Set up environment variables
+export ANDROID_HOME=/opt/android-sdk
+export ANDROID_SDK_ROOT=/opt/android-sdk
+export PATH=/opt/android-sdk/cmdline-tools/bin:/usr/local/bin:/usr/bin:$PATH
+
+# Pre-accept Android SDK licenses on startup for flutteruser
+echo "Pre-accepting Android SDK licenses..."
+sudo -u flutteruser bash -c "export ANDROID_HOME=/opt/android-sdk ANDROID_SDK_ROOT=/opt/android-sdk PATH=/opt/android-sdk/cmdline-tools/bin:/usr/local/bin:/usr/bin:\$PATH && yes | flutter doctor --android-licenses >/dev/null 2>&1 || yes | /opt/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=/opt/android-sdk --licenses >/dev/null 2>&1" || true
 
 # Export for child processes
 export SOCAT_PID

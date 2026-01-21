@@ -122,7 +122,30 @@ RUN git config --global --add safe.directory /usr/local/flutter && \
 COPY docker-entrypoint.sh /usr/local/bin/
 COPY flutter-doctor-wrapper.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/flutter-doctor-wrapper.sh && \
-    chown flutteruser:flutteruser /usr/local/bin/docker-entrypoint.sh /usr/local/bin/flutter-doctor-wrapper.sh
+    chown flutteruser:flutteruser /usr/local/bin/docker-entrypoint.sh /usr/local/bin/flutter-doctor-wrapper.sh && \
+    ln -sf /opt/android-sdk/cmdline-tools/bin/sdkmanager /usr/local/bin/sdkmanager && \
+    ln -sf /opt/android-sdk/cmdline-tools/bin/sdkmanager /usr/bin/sdkmanager
+
+# Pre-accept all licenses for flutter doctor
+RUN echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > /opt/android-sdk/licenses/android-sdk-license && \
+    echo "d56f5187479451eabf01fb78af6dfcb131b33910" >> /opt/android-sdk/licenses/android-sdk-license && \
+    mkdir -p /home/flutteruser/.android && \
+    echo "### Android SDK Manager" > /home/flutteruser/.android/repositories.cfg && \
+    chown -R flutteruser:flutteruser /home/flutteruser/.android && \
+    chown -R flutteruser:flutteruser /opt/android-sdk/licenses
+
+# Create initialization script that pre-accepts licenses on startup
+RUN mkdir -p /etc/init.d && cat > /etc/profile.d/android-init.sh << 'ANDROID_INIT'
+#!/bin/bash
+# Pre-accept Android licenses on any shell startup
+if [ -z "$ANDROID_LICENSES_INITIALIZED" ]; then
+    export ANDROID_LICENSES_INITIALIZED=1
+    export ANDROID_HOME=/opt/android-sdk
+    export ANDROID_SDK_ROOT=/opt/android-sdk
+    yes 2>/dev/null | /opt/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=/opt/android-sdk --licenses >/dev/null 2>&1 || true
+fi
+ANDROID_INIT
+chmod +x /etc/profile.d/android-init.sh
 
 # Set working directory
 WORKDIR /workspace

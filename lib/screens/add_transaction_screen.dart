@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/services/transaction_provider.dart';
+import 'package:mamoney/services/auth_provider.dart';
+import 'package:mamoney/services/firebase_service.dart';
+import 'package:mamoney/services/ai_service.dart';
 import 'package:intl/intl.dart';
 
 class AddTransactionScreen extends StatefulWidget {
@@ -14,9 +17,11 @@ class AddTransactionScreen extends StatefulWidget {
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
+  final _aiMessageController = TextEditingController();
   TransactionType _selectedType = TransactionType.expense;
   String _selectedCategory = 'Food';
   DateTime _selectedDate = DateTime.now();
+  bool _isParsingAI = false;
 
   final List<String> incomeCategories = [
     'Salary',
@@ -39,10 +44,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   void dispose() {
     _descriptionController.dispose();
     _amountController.dispose();
+    _aiMessageController.dispose();
     super.dispose();
   }
 
-  void _handleAddTransaction() {
+  Future<void> _handleAddTransaction() async {
     final description = _descriptionController.text.trim();
     final amountStr = _amountController.text.trim();
 
@@ -61,9 +67,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return;
     }
 
+    // Ensure user is signed in
+    final uid = FirebaseService().currentUser?.uid;
+    if (uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to add a transaction')),
+      );
+      return;
+    }
+
     final transaction = Transaction(
       id: '',
-      userId: '',
+      userId: uid,
       description: description,
       amount: amount,
       type: _selectedType,
@@ -72,8 +87,73 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       createdAt: DateTime.now(),
     );
 
-    context.read<TransactionProvider>().addTransaction(transaction);
+    final provider = context.read<TransactionProvider>();
+    await provider.addTransaction(transaction);
+
+    if (provider.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add transaction: ${provider.error}')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Transaction added')),
+    );
     Navigator.pop(context);
+  }
+
+  Future<void> _parseAIMessage() async {
+    final aiMessage = _aiMessageController.text.trim();
+
+    if (aiMessage.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter an AI message')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isParsingAI = true;
+    });
+
+    try {
+      final result = await AIService.parseTransactionMessage(aiMessage);
+
+      if (!mounted) return;
+
+      if (result.containsKey('error')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${result['error']}')),
+        );
+      } else {
+        final description = result['description'] ?? '';
+        final amount = result['amount'] ?? '';
+
+        if (description.isNotEmpty) {
+          _descriptionController.text = description;
+        }
+        if (amount.isNotEmpty) {
+          _amountController.text = amount;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Transaction details extracted successfully!'),
+          ),
+        );
+
+        // Clear AI message field
+        _aiMessageController.clear();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isParsingAI = false;
+        });
+      }
+    }
   }
 
   @override
@@ -89,6 +169,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Transaction'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              context.read<AuthProvider>().signOut();
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -96,6 +184,54 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Text(
+                'AI Message',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _aiMessageController,
+                      decoration: InputDecoration(
+                        labelText: 'Describe transaction (e.g., "Bought lunch for 50 dollars")',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.smart_toy),
+                        suffixIcon: _isParsingAI
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Padding(
+                                  padding: EdgeInsets.all(12.0),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              )
+                            : null,
+                      ),
+                      maxLines: 2,
+                      enabled: !_isParsingAI,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: _isParsingAI ? null : _parseAIMessage,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Parse'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               Text(
                 'Transaction Type',
                 style: Theme.of(context).textTheme.titleMedium,

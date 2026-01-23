@@ -15,7 +15,9 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
 
   AuthProvider() {
-    _initializeAuthState();
+    if (_firebaseService.isInitialized) {
+      _initializeAuthState();
+    }
   }
 
   Future<void> _initializeAuthState() async {

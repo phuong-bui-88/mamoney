@@ -1,0 +1,22 @@
+Launching lib/main.dart on sdk gphone64 x86 64 in debug mode...
+Running Gradle task 'assembleDebug'...                          
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Timeout waiting to lock build logic queue. It is currently in use by another Gradle instance.
+Owner PID: 672
+Our PID: 650
+Owner Operation: 
+Our operation: 
+Lock file: /workspace/android/.gradle/noVersion/buildLogic.lock
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3m 40s
+Running Gradle task 'assembleDebug'...                            221.5s
+Error: Gradle task assembleDebug failed with exit code 1

@@ -3,9 +3,7 @@
   "dockerComposeFile": "../docker-compose.yml",
   "service": "flutter-dev",
   "workspaceFolder": "/workspace",
-  "features": {
-    "ghcr.io/devcontainers/features/git:1": {}
-  },
+  "remoteUser": "flutteruser",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -13,34 +11,33 @@
         "Dart-Code.flutter",
         "ms-vscode.cpptools",
         "esbenp.prettier-vscode",
-        "DBSonder.more-flutter-snippets"
+        "DBSonder.more-flutter-snippets",
+        "GitHub.copilot"
       ],
       "settings": {
         "dart.sdk": "/usr/local/flutter/bin/cache/dart-sdk",
         "dart.flutterSdkPath": "/usr/local/flutter",
-        "dart.triggerSignatureHelpAutomatically": true,
-        "editor.formatOnSave": true,
-        "[dart]": {
-          "editor.defaultFormatter": null,
-          "editor.formatOnSave": true
-        }
+        "editor.formatOnSave": true
       }
     }
   },
-  "remoteUser": "root",
-  "forwardPorts": [
-    8080,
-    5037
-  ],
   "portsAttributes": {
-    "8080": {
+    "8081": {
       "label": "Flutter Web App",
       "onAutoForward": "notify"
     },
     "5037": {
-      "label": "ADB Daemon",
+      "label": "ADB Server",
       "onAutoForward": "silent"
     }
   },
-  "postCreateCommand": "flutter --version && flutter pub get && flutter doctor && flutter build web"
+  "remoteEnv": {
+    "ADB_SERVER_SOCKET": "tcp:127.0.0.1:5037",
+    "ADB_HOST": "127.0.0.1",
+    "ADB_PORT": "5037",
+    "ANDROID_HOME": "/opt/android-sdk",
+    "ANDROID_SDK_ROOT": "/opt/android-sdk",
+    "PATH": "/opt/android-sdk/platform-tools:/usr/local/flutter/bin:/usr/local/flutter/bin/cache/dart-sdk/bin:$PATH"
+  },
+  "postCreateCommand": "flutter doctor && echo 'Use Windows ADB: adb devices should list emulator'"
 }

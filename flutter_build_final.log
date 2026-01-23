@@ -1,0 +1,22 @@
+Launching lib/main.dart on sdk gphone64 x86 64 in debug mode...
+Running Gradle task 'assembleDebug'...                          
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Script '/usr/local/flutter/packages/flutter_tools/gradle/flutter.gradle' line: 9
+
+* What went wrong:
+A problem occurred evaluating script.
+> You are applying Flutter's main Gradle plugin imperatively using the apply script method, which is not possible anymore. Migrate to applying Gradle plugins with the declarative plugins block: https://flutter.dev/to/flutter-gradle-plugin-apply
+
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 46s
+Running Gradle task 'assembleDebug'...                             47.3s
+Error: Gradle task assembleDebug failed with exit code 1

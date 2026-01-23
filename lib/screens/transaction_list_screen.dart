@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/services/transaction_provider.dart';
+import 'package:mamoney/services/auth_provider.dart';
 import 'package:intl/intl.dart';
 
 class TransactionListScreen extends StatefulWidget {
@@ -18,6 +19,14 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('All Transactions'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              context.read<AuthProvider>().signOut();
+            },
+          ),
+        ],
       ),
       body: Consumer<TransactionProvider>(
         builder: (context, transactionProvider, _) {

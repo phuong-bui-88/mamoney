@@ -26,6 +26,10 @@ dependencies:
   # AI
   http: ^1.1.0
   
+  # Speech to text
+  speech_to_text: ^6.1.1
+  permission_handler: ^11.0.1
+  
   # Utilities
   get_it: ^9.2.0
   uuid: ^4.0.0

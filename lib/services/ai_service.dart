@@ -46,7 +46,7 @@ class AIService {
             'role': 'system',
             'content': 'You are a financial assistant that extracts transaction details from user messages. '
                 'Extract the description (what was bought/earned) and the amount (number only). '
-                'Convert Vietnamese number notation: k = thousands (50k = 50000), m = millions (1m = 1000000). '
+                'Convert Vietnamese number notation: k = thousands (50k = 50000), m = millions (1m = 1000000), tr = millions (2tr = 2000000). '
                 'Return response in format: DESCRIPTION: [description] | AMOUNT: [amount]'
           },
           {

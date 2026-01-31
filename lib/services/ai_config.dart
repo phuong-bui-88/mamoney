@@ -3,10 +3,15 @@
 /// Uses GitHub's AI Model Marketplace to access Azure OpenAI models
 class AIConfig {
   // GitHub Personal Access Token (PAT)
-  // Get yours from: https://github.com/settings/tokens
-  // Make sure to enable 'read:model-garden' scope
-  static const String githubToken =
-      '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';
+  // Set via --dart-define=GITHUB_TOKEN=<your_token> at build time
+  // Note: String.fromEnvironment reads values at compile time, not runtime
+  // Get your token from: https://github.com/settings/tokens
+  // Ensure 'read:model-garden' scope is enabled
+
+  static const String githubToken = String.fromEnvironment(
+    'GITHUB_TOKEN',
+    defaultValue: '',
+  );
 
   // GitHub Models endpoint
   static const String endpoint = 'https://models.github.ai/inference';

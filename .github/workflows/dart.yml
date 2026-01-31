@@ -20,7 +20,12 @@ jobs:
       - run: pod repo update
         working-directory: ios
 
-      - run: flutter build ios --release --no-codesign
+      - name: Build iOS with dart-define
+        run: |
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --dart-define=GITHUB_TOKEN=${{ secrets.TOKEN_API }}
 
       - run: mkdir Payload
         working-directory: build/ios/iphoneos

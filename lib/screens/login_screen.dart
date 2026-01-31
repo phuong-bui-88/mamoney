@@ -12,7 +12,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isSignUp = true; // Start in sign up mode for new users
+  bool _isSignUp = false; // Start in sign in mode
   bool _obscurePassword = true;
 
   @override
@@ -27,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      debugPrint('Email or password is empty');
+      print('Email or password is empty');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
@@ -37,14 +37,14 @@ class _LoginScreenState extends State<LoginScreen> {
     // Basic email validation
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
     if (!emailRegex.hasMatch(email)) {
-      debugPrint('Email validation failed for email: $email');
+      print('Email validation failed for email: $email');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid email address')),
       );
       return;
     }
 
-    debugPrint('Email validation passed');
+    print('Email validation passed');
 
     // Password validation
     if (password.length < 2) {
@@ -57,10 +57,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = context.read<AuthProvider>();
 
     if (_isSignUp) {
-      debugPrint('Signing up with email: $email');
+      print('Signing up with email: $email');
       authProvider.signUp(email, password);
     } else {
-      debugPrint('Signing in with email: $email');
+      print('Signing in with email: $email');
       authProvider.signIn(email, password);
     }
   }
@@ -142,23 +142,76 @@ class _LoginScreenState extends State<LoginScreen> {
                             textAlign: TextAlign.center,
                           ),
                         ),
-                      ElevatedButton(
-                        onPressed: authProvider.isLoading ? null : _handleAuth,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context).primaryColor,
+                              Theme.of(context).primaryColor.withOpacity(0.8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(context)
+                                  .primaryColor
+                                  .withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
-                        child: authProvider.isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                _isSignUp ? 'Sign Up' : 'Sign In',
-                                style: const TextStyle(fontSize: 16),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: authProvider.isLoading ? null : _handleAuth,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 16,
+                                horizontal: 24,
                               ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (!authProvider.isLoading)
+                                    Icon(
+                                      _isSignUp
+                                          ? Icons.person_add
+                                          : Icons.login,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  if (!authProvider.isLoading)
+                                    const SizedBox(width: 8),
+                                  if (authProvider.isLoading)
+                                    const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      _isSignUp ? 'Sign Up' : 'Sign In',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   );

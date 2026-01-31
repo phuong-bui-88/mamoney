@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/services/firebase_service.dart';
@@ -8,6 +9,7 @@ class TransactionProvider extends ChangeNotifier {
   List<Transaction> _transactions = [];
   bool _isLoading = false;
   String? _error;
+  StreamSubscription? _transactionSubscription;
 
   List<Transaction> get transactions => _transactions;
   bool get isLoading => _isLoading;
@@ -27,12 +29,21 @@ class TransactionProvider extends ChangeNotifier {
     _initializeTransactionStream();
   }
 
-  void _initializeTransactionStream() async {
+  void _initializeTransactionStream() {
+    // Cancel any existing subscription
+    _transactionSubscription?.cancel();
+
     final transactionStream = _firebaseService.getTransactionsStream();
-    transactionStream.listen((transactions) {
+    _transactionSubscription = transactionStream.listen((transactions) {
+      // Sort transactions by createdAt in descending order
+      transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _transactions = transactions;
       notifyListeners();
     });
+  }
+
+  void reset() {
+    _initializeTransactionStream();
   }
 
   Future<void> addTransaction(Transaction transaction) async {
@@ -88,5 +99,11 @@ class TransactionProvider extends ChangeNotifier {
 
   List<Transaction> getTransactionsByCategory(String category) {
     return _transactions.where((t) => t.category == category).toList();
+  }
+
+  @override
+  void dispose() {
+    _transactionSubscription?.cancel();
+    super.dispose();
   }
 }

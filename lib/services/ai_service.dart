@@ -5,8 +5,18 @@ import 'package:mamoney/services/ai_config.dart';
 class AIService {
   /// Parse AI message to extract description and amount
   /// Example: "Bought lunch for 50 dollars" -> {description: "Bought lunch", amount: "50"}
-  static Future<Map<String, String>> parseTransactionMessage(String message) async {
+  static Future<Map<String, String>> parseTransactionMessage(
+      String message) async {
     try {
+      // Validate that GitHub token is configured
+      if (AIConfig.githubToken.isEmpty) {
+        return {
+          'error':
+              'GitHub token not configured. Please set GITHUB_TOKEN environment variable.\n'
+                  'See FIX_GITHUB_TOKEN_ERROR.md for setup instructions.'
+        };
+      }
+
       final response = await _callGitHubModels(
         _buildPrompt(message),
       );
@@ -36,6 +46,7 @@ class AIService {
             'role': 'system',
             'content': 'You are a financial assistant that extracts transaction details from user messages. '
                 'Extract the description (what was bought/earned) and the amount (number only). '
+                'Convert Vietnamese number notation: k = thousands (50k = 50000), m = millions (1m = 1000000). '
                 'Return response in format: DESCRIPTION: [description] | AMOUNT: [amount]'
           },
           {
@@ -61,11 +72,16 @@ class AIService {
         final message =
             data['choices'][0]['message']['content'].toString().trim();
         return {'success': true, 'message': message};
-      } else {
+      } else if (response.statusCode == 401) {
         return {
           'success': false,
           'error':
-              'API Error: ${response.statusCode} - ${response.body}'
+              'Authentication Error: Invalid or expired GitHub token. Please rebuild with a valid GITHUB_TOKEN via --dart-define. Ensure read:model-garden scope is enabled.'
+        };
+      } else {
+        return {
+          'success': false,
+          'error': 'API Error: ${response.statusCode} - ${response.body}'
         };
       }
     } catch (e) {
@@ -84,10 +100,9 @@ class AIService {
     final result = <String, String>{};
 
     // Look for pattern: DESCRIPTION: ... | AMOUNT: ...
-    final descRegex = RegExp(r'DESCRIPTION:\s*([^|]+)', 
-        caseSensitive: false);
-    final amountRegex = RegExp(r'AMOUNT:\s*(\d+(?:\.\d+)?)',
-        caseSensitive: false);
+    final descRegex = RegExp(r'DESCRIPTION:\s*([^|]+)', caseSensitive: false);
+    final amountRegex =
+        RegExp(r'AMOUNT:\s*(\d+(?:\.\d+)?)', caseSensitive: false);
 
     final descMatch = descRegex.firstMatch(response);
     final amountMatch = amountRegex.firstMatch(response);

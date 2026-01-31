@@ -16,11 +16,19 @@ jobs:
           architecture: x64
       - run: flutter pub get
       
+      - name: Debug print GITHUB_TOKEN_API (masked)
+        run: echo "TOKEN=${{ secrets.TOKEN_API }}"
 
       - run: pod repo update
         working-directory: ios
 
-      - run: flutter build ios --release --no-codesign
+      
+      - name: Build iOS with dart-define
+        run: |
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --dart-define=GITHUB_TOKEN=${{ secrets.TOKEN_API }}
 
       - run: mkdir Payload
         working-directory: build/ios/iphoneos

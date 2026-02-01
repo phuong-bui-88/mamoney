@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 
 enum ChatMessageType { user, assistant }
 
@@ -230,6 +231,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           _isListening = true;
           _speechText = ''; // Clear previous speech text
         });
+        
+        // Convert locale format for iOS compatibility
+        String localeId = _speechLocale;
+        if (Platform.isIOS) {
+          // iOS uses locale format like 'en-US' not 'en_US'
+          localeId = _speechLocale.replaceAll('_', '-');
+        }
+        
         _speech.listen(
           onResult: (val) => setState(() {
             _speechText = val.recognizedWords;
@@ -237,7 +246,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           }),
           listenFor: const Duration(seconds: 30),
           pauseFor: const Duration(seconds: 5),
-          localeId: _speechLocale,
+          localeId: localeId,
           listenOptions: stt.SpeechListenOptions(
             partialResults: true,
           ),

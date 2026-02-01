@@ -306,6 +306,77 @@ void main() {
     });
   });
 
+  group('ThousandsSeparatorInputFormatter', () {
+    late ThousandsSeparatorInputFormatter formatter;
+
+    setUp(() {
+      formatter = ThousandsSeparatorInputFormatter();
+    });
+
+    test('should format numbers with thousand separators', () {
+      const oldValue = TextEditingValue(text: '');
+      const newValue = TextEditingValue(text: '1234567');
+
+      final result = formatter.formatEditUpdate(oldValue, newValue);
+
+      expect(result.text, '1,234,567');
+    });
+
+    test('should handle empty input', () {
+      const oldValue = TextEditingValue(text: '1,234');
+      const newValue = TextEditingValue(text: '');
+
+      final result = formatter.formatEditUpdate(oldValue, newValue);
+
+      expect(result.text, '');
+    });
+
+    test('should reject invalid input', () {
+      const oldValue = TextEditingValue(text: '123');
+      const newValue = TextEditingValue(text: 'abc');
+
+      final result = formatter.formatEditUpdate(oldValue, newValue);
+
+      expect(result.text, '123');
+    });
+
+    test('should handle numbers less than 1000', () {
+      const oldValue = TextEditingValue(text: '');
+      const newValue = TextEditingValue(text: '999');
+
+      final result = formatter.formatEditUpdate(oldValue, newValue);
+
+      expect(result.text, '999');
+    });
+
+    test('should format Vietnamese common amounts - 50k', () {
+      const oldValue = TextEditingValue(text: '');
+      const newValue = TextEditingValue(text: '50000');
+
+      final result = formatter.formatEditUpdate(oldValue, newValue);
+
+      expect(result.text, '50,000');
+    });
+
+    test('should handle backspace on formatted number', () {
+      const oldValue = TextEditingValue(text: '1,234');
+      const newValue = TextEditingValue(text: '1,23');
+
+      final result = formatter.formatEditUpdate(oldValue, newValue);
+
+      expect(result.text, '123');
+    });
+
+    test('should place cursor at end of formatted text', () {
+      const oldValue = TextEditingValue(text: '');
+      const newValue = TextEditingValue(text: '1234');
+
+      final result = formatter.formatEditUpdate(oldValue, newValue);
+
+      expect(result.selection.baseOffset, result.text.length);
+    });
+  });
+
   group('Edge Cases', () {
     test('ChatMessage should handle multiline text', () {
       final message = ChatMessage(
@@ -365,6 +436,210 @@ void main() {
       );
 
       expect(message.text, '  spaces  around  ');
+    });
+
+    test('TransactionRecord should handle maximum decimal precision', () {
+      final now = DateTime.now();
+      final record = TransactionRecord(
+        description: 'Test',
+        amount: 123.456789,
+        category: 'Food',
+        date: now,
+        type: TransactionType.expense,
+        userMessage: 'test 123.456789',
+      );
+
+      expect(record.amount, 123.456789);
+    });
+
+    test('ChatMessage should handle emoji in text', () {
+      final message = ChatMessage(
+        type: ChatMessageType.assistant,
+        text: 'Great! 🎉 You spent 💰 50k on 🍔',
+      );
+
+      expect(message.text, contains('🎉'));
+      expect(message.text, contains('💰'));
+      expect(message.text, contains('🍔'));
+    });
+  });
+
+  group('Negative Test Cases', () {
+    test('TransactionRecord should accept zero category', () {
+      final now = DateTime.now();
+      final record = TransactionRecord(
+        description: 'Test',
+        amount: 100,
+        category: '',
+        date: now,
+        type: TransactionType.expense,
+        userMessage: 'test',
+      );
+
+      expect(record.category, isEmpty);
+    });
+
+    test('ChatMessage should handle extremely long text', () {
+      final longText = 'a' * 10000;
+      final message = ChatMessage(
+        type: ChatMessageType.user,
+        text: longText,
+      );
+
+      expect(message.text.length, 10000);
+    });
+
+    test('TransactionRecord should handle very large amounts', () {
+      final now = DateTime.now();
+      final record = TransactionRecord(
+        description: 'House',
+        amount: double.maxFinite,
+        category: 'Other',
+        date: now,
+        type: TransactionType.expense,
+        userMessage: 'house',
+      );
+
+      expect(record.amount, double.maxFinite);
+    });
+
+    test('TransactionRecord should handle NaN amount', () {
+      final now = DateTime.now();
+      final record = TransactionRecord(
+        description: 'Invalid',
+        amount: double.nan,
+        category: 'Other',
+        date: now,
+        type: TransactionType.expense,
+        userMessage: 'invalid',
+      );
+
+      expect(record.amount.isNaN, isTrue);
+    });
+
+    test('ChatMessage with only whitespace', () {
+      final message = ChatMessage(
+        type: ChatMessageType.user,
+        text: '     ',
+      );
+
+      expect(message.text, '     ');
+      expect(message.text.trim(), isEmpty);
+    });
+  });
+
+  group('Category Validation', () {
+    test('should have valid expense categories with emojis', () {
+      const expenseCategories = [
+        '🏠 Housing',
+        '🍚 Food',
+        '🚗 Transportation',
+        '💡 Utilities',
+        '🏥 Healthcare'
+      ];
+
+      for (final category in expenseCategories) {
+        final now = DateTime.now();
+        final record = TransactionRecord(
+          description: 'Test',
+          amount: 100,
+          category: category,
+          date: now,
+          type: TransactionType.expense,
+          userMessage: 'test',
+        );
+
+        expect(record.category, category);
+        expect(category.length, greaterThan(5)); // Has emoji + text
+      }
+    });
+
+    test('should have valid income categories without emojis', () {
+      const incomeCategories = [
+        'Salary',
+        'Freelance',
+        'Investment',
+        'Gift',
+        'Other'
+      ];
+
+      for (final category in incomeCategories) {
+        final now = DateTime.now();
+        final record = TransactionRecord(
+          description: 'Test',
+          amount: 100,
+          category: category,
+          date: now,
+          type: TransactionType.income,
+          userMessage: 'test',
+        );
+
+        expect(record.category, category);
+      }
+    });
+  });
+
+  group('UserMessage Field Tests', () {
+    test('should preserve original user message', () {
+      final now = DateTime.now();
+      final record = TransactionRecord(
+        description: 'Lunch at cafe',
+        amount: 50000,
+        category: 'Food',
+        date: now,
+        type: TransactionType.expense,
+        userMessage: 'va xe 50k',
+      );
+
+      expect(record.userMessage, 'va xe 50k');
+      expect(record.description, 'Lunch at cafe');
+      expect(record.userMessage, isNot(equals(record.description)));
+    });
+
+    test('should handle userMessage with special characters', () {
+      final now = DateTime.now();
+      final record = TransactionRecord(
+        description: 'Dinner',
+        amount: 100000,
+        category: 'Food',
+        date: now,
+        type: TransactionType.expense,
+        userMessage: 'dinner @ restaurant #1 (50% off) 100k!',
+      );
+
+      expect(record.userMessage, contains('@'));
+      expect(record.userMessage, contains('#'));
+      expect(record.userMessage, contains('%'));
+      expect(record.userMessage, contains('!'));
+    });
+
+    test('should handle Vietnamese text in userMessage', () {
+      final now = DateTime.now();
+      final record = TransactionRecord(
+        description: 'Gas',
+        amount: 50000,
+        category: 'Transportation',
+        date: now,
+        type: TransactionType.expense,
+        userMessage: 'vừa xăng xe 50k',
+      );
+
+      expect(record.userMessage, contains('vừa'));
+      expect(record.userMessage, contains('xăng'));
+    });
+
+    test('should handle empty userMessage', () {
+      final now = DateTime.now();
+      final record = TransactionRecord(
+        description: 'Manual entry',
+        amount: 100,
+        category: 'Food',
+        date: now,
+        type: TransactionType.expense,
+        userMessage: '',
+      );
+
+      expect(record.userMessage, isEmpty);
     });
   });
 }

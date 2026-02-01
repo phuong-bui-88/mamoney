@@ -26,6 +26,41 @@ void main() {
         expect(transaction.category, 'Food');
         expect(transaction.date, now);
         expect(transaction.createdAt, now);
+        expect(transaction.userMessage, isNull);
+      });
+
+      test('should create transaction with userMessage', () {
+        final now = DateTime.now();
+        final transaction = Transaction(
+          id: 'test-id',
+          userId: 'user-123',
+          description: 'Lunch at cafe',
+          amount: 50000,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: now,
+          createdAt: now,
+          userMessage: 'va xe 50k',
+        );
+
+        expect(transaction.userMessage, 'va xe 50k');
+        expect(transaction.description, 'Lunch at cafe');
+      });
+
+      test('should create transaction without userMessage', () {
+        final now = DateTime.now();
+        final transaction = Transaction(
+          id: 'test-id',
+          userId: 'user-123',
+          description: 'Manual entry',
+          amount: 100,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: now,
+          createdAt: now,
+        );
+
+        expect(transaction.userMessage, isNull);
       });
 
       test('should create income transaction', () {
@@ -83,6 +118,27 @@ void main() {
         expect(map['category'], 'Food');
         expect(map['date'], isA<Timestamp>());
         expect(map['createdAt'], isA<Timestamp>());
+        expect(map['userMessage'], isNull);
+      });
+
+      test('should convert transaction with userMessage to map', () {
+        final now = DateTime.now();
+        final transaction = Transaction(
+          id: 'test-id',
+          userId: 'user-123',
+          description: 'Lunch',
+          amount: 50000,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: now,
+          createdAt: now,
+          userMessage: 'lunch 50k',
+        );
+
+        final map = transaction.toMap();
+
+        expect(map['userMessage'], 'lunch 50k');
+        expect(map['description'], 'Lunch');
       });
 
       test('should convert income type to string', () {
@@ -158,6 +214,27 @@ void main() {
         expect(transaction.amount, 100.0);
         expect(transaction.type, TransactionType.expense);
         expect(transaction.category, 'Food');
+        expect(transaction.userMessage, isNull);
+      });
+
+      test('should create transaction from map with userMessage', () {
+        final now = DateTime.now();
+        final map = {
+          'id': 'test-id',
+          'userId': 'user-123',
+          'description': 'Dinner',
+          'amount': 100000.0,
+          'type': 'expense',
+          'category': 'Food',
+          'date': Timestamp.fromDate(now),
+          'createdAt': Timestamp.fromDate(now),
+          'userMessage': 'dinner 100k',
+        };
+
+        final transaction = Transaction.fromMap(map);
+
+        expect(transaction.userMessage, 'dinner 100k');
+        expect(transaction.description, 'Dinner');
       });
 
       test('should parse income type from string', () {
@@ -243,6 +320,26 @@ void main() {
         expect(copied.id, 'new-id');
         expect(copied.userId, original.userId);
         expect(copied.description, original.description);
+      });
+
+      test('should copy transaction with new userMessage', () {
+        final original = Transaction(
+          id: '1',
+          userId: 'user1',
+          description: 'Lunch',
+          amount: 50000,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+          userMessage: 'lunch 50k',
+        );
+
+        final copied = original.copyWith(userMessage: 'updated lunch 50k');
+
+        expect(copied.userMessage, 'updated lunch 50k');
+        expect(copied.description, original.description);
+        expect(copied.amount, original.amount);
       });
 
       test('should copy transaction with new amount', () {

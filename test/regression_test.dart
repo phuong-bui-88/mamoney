@@ -375,6 +375,57 @@ void main() {
         expect(result.text, '');
       });
 
+      test('NEGATIVE: Transaction with null-like empty strings', () {
+        final transaction = Transaction(
+          id: '',
+          userId: '',
+          description: '',
+          amount: 0,
+          type: TransactionType.expense,
+          category: '',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+          userMessage: '',
+        );
+
+        expect(transaction.id, isEmpty);
+        expect(transaction.userId, isEmpty);
+        expect(transaction.description, isEmpty);
+        expect(transaction.category, isEmpty);
+        expect(transaction.userMessage, isEmpty);
+      });
+
+      test('NEGATIVE: AIService extraction with malformed response', () {
+        const response = 'Random text without proper format';
+
+        final descRegex = RegExp(r'DESCRIPTION:\s*([^|]+)', caseSensitive: false);
+        final amountRegex =
+            RegExp(r'AMOUNT:\s*(\d+(?:\.\d+)?)', caseSensitive: false);
+
+        final descMatch = descRegex.firstMatch(response);
+        final amountMatch = amountRegex.firstMatch(response);
+
+        expect(descMatch, isNull);
+        expect(amountMatch, isNull);
+      });
+
+      test('NEGATIVE: Transaction serialization with extreme dates', () {
+        final extremeDate = DateTime.fromMillisecondsSinceEpoch(0);
+        final transaction = Transaction(
+          id: '1',
+          userId: 'user1',
+          description: 'Test',
+          amount: 100,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: extremeDate,
+          createdAt: extremeDate,
+        );
+
+        final map = transaction.toMap();
+        expect(() => Transaction.fromMap(map), returnsNormally);
+      });
+
       test('NEGATIVE: Empty string in all formatter operations', () {
         final formatter = ThousandsSeparatorInputFormatter();
         const oldValue = TextEditingValue(text: '');
@@ -392,6 +443,222 @@ void main() {
       test('NEGATIVE: Currency format with infinity', () {
         // formatCurrency should handle infinity gracefully
         expect(() => formatCurrency(double.infinity), returnsNormally);
+      });
+
+      test('NEGATIVE: Formatter with mixed commas and numbers', () {
+        final formatter = ThousandsSeparatorInputFormatter();
+        const oldValue = TextEditingValue(text: '');
+        const newValue = TextEditingValue(text: '1,2,3,4');
+
+        final result = formatter.formatEditUpdate(oldValue, newValue);
+        // Should strip commas and reformat
+        expect(result.text, '1,234');
+      });
+
+      test('NEGATIVE: Transaction copyWith preserving userMessage', () {
+        final original = Transaction(
+          id: '1',
+          userId: 'user1',
+          description: 'Original',
+          amount: 100,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+          userMessage: 'original message',
+        );
+
+        final copied = original.copyWith(description: 'Updated');
+
+        expect(copied.userMessage, original.userMessage);
+        expect(copied.description, 'Updated');
+      });
+    });
+
+    group('UserMessage Regressions', () {
+      test('REGRESSION: userMessage should be preserved in serialization', () {
+        final original = Transaction(
+          id: '1',
+          userId: 'user1',
+          description: 'Lunch',
+          amount: 50000,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+          userMessage: 'va xe 50k',
+        );
+
+        final map = original.toMap();
+        final restored = Transaction.fromMap(map);
+
+        expect(restored.userMessage, 'va xe 50k');
+      });
+
+      test('REGRESSION: userMessage should handle null correctly', () {
+        final original = Transaction(
+          id: '1',
+          userId: 'user1',
+          description: 'Manual entry',
+          amount: 100,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+        );
+
+        final map = original.toMap();
+        expect(map['userMessage'], isNull);
+
+        final restored = Transaction.fromMap(map);
+        expect(restored.userMessage, isNull);
+      });
+
+      test('REGRESSION: userMessage with special Vietnamese characters', () {
+        final transaction = Transaction(
+          id: '1',
+          userId: 'user1',
+          description: 'Gas',
+          amount: 50000,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+          userMessage: 'vừa đổ xăng xe 50k ở trạm gần nhà',
+        );
+
+        final map = transaction.toMap();
+        final restored = Transaction.fromMap(map);
+
+        expect(restored.userMessage, contains('vừa'));
+        expect(restored.userMessage, contains('đổ'));
+        expect(restored.userMessage, contains('ở'));
+      });
+
+      test('REGRESSION: userMessage copyWith should update correctly', () {
+        final original = Transaction(
+          id: '1',
+          userId: 'user1',
+          description: 'Lunch',
+          amount: 50000,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+          userMessage: 'original message',
+        );
+
+        final updated = original.copyWith(userMessage: 'updated message');
+
+        expect(updated.userMessage, 'updated message');
+        expect(original.userMessage, 'original message');
+      });
+    });
+
+    group('Category Extraction Regressions', () {
+      test('REGRESSION: Should extract category from AI response', () {
+        const response =
+            'DESCRIPTION: Rent | AMOUNT: 5000000 | CATEGORY: 🏠 Housing';
+
+        final categoryRegex =
+            RegExp(r'CATEGORY:\s*([^|]+)', caseSensitive: false);
+        final match = categoryRegex.firstMatch(response);
+
+        expect(match, isNotNull);
+        expect(match?.group(1)?.trim(), '🏠 Housing');
+      });
+
+      test('REGRESSION: Should handle missing category gracefully', () {
+        const response = 'DESCRIPTION: Lunch | AMOUNT: 50';
+
+        final categoryRegex =
+            RegExp(r'CATEGORY:\s*([^|]+)', caseSensitive: false);
+        final match = categoryRegex.firstMatch(response);
+
+        expect(match, isNull);
+      });
+
+      test('REGRESSION: Should extract category with emoji correctly', () {
+        const categories = [
+          '🏠 Housing',
+          '🍚 Food',
+          '🚗 Transportation',
+          '💡 Utilities',
+          '🏥 Healthcare'
+        ];
+
+        for (final category in categories) {
+          final response =
+              'DESCRIPTION: Test | AMOUNT: 100 | CATEGORY: $category';
+          final categoryRegex =
+              RegExp(r'CATEGORY:\s*([^|]+)', caseSensitive: false);
+          final match = categoryRegex.firstMatch(response);
+
+          expect(match?.group(1)?.trim(), category);
+        }
+      });
+    });
+
+    group('Stress Tests', () {
+      test('STRESS: Formatter with rapid sequential updates', () {
+        final formatter = ThousandsSeparatorInputFormatter();
+
+        for (var i = 1; i <= 1000; i++) {
+          final oldValue = TextEditingValue(text: (i - 1).toString());
+          final newValue = TextEditingValue(text: i.toString());
+
+          expect(
+            () => formatter.formatEditUpdate(oldValue, newValue),
+            returnsNormally,
+          );
+        }
+      });
+
+      test('STRESS: Transaction creation with extreme values', () {
+        final extremeValues = [
+          0.0,
+          0.000001,
+          double.maxFinite / 2,
+          999999999999.99,
+        ];
+
+        for (final amount in extremeValues) {
+          expect(
+            () => Transaction(
+              id: 'test',
+              userId: 'user',
+              description: 'Test',
+              amount: amount,
+              type: TransactionType.expense,
+              category: 'Food',
+              date: DateTime.now(),
+              createdAt: DateTime.now(),
+            ),
+            returnsNormally,
+          );
+        }
+      });
+
+      test('STRESS: Multiple transactions with same timestamp', () {
+        final timestamp = DateTime.now();
+        final transactions = List.generate(
+          100,
+          (i) => Transaction(
+            id: 'id-$i',
+            userId: 'user1',
+            description: 'Transaction $i',
+            amount: i.toDouble(),
+            type: TransactionType.expense,
+            category: 'Food',
+            date: timestamp,
+            createdAt: timestamp,
+          ),
+        );
+
+        expect(transactions.length, 100);
+        expect(
+            transactions.every((t) => t.date == timestamp && t.createdAt == timestamp),
+            isTrue);
       });
     });
   });

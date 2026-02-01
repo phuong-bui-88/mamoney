@@ -7,9 +7,6 @@ import 'package:mamoney/services/firebase_service.dart';
 import 'package:mamoney/services/ai_service.dart';
 import 'package:intl/intl.dart';
 import 'package:mamoney/utils/currency_utils.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:permission_handler/permission_handler.dart';
-import 'dart:io';
 
 enum ChatMessageType { user, assistant }
 
@@ -94,12 +91,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   // Completed transactions state
   final List<TransactionRecord> _completedTransactions = [];
 
-  // Speech to text
-  late stt.SpeechToText _speech;
-  bool _isListening = false;
-  String _speechText = '';
-  String _speechLocale = 'en_US'; // Add support for different locales
-
   final List<String> incomeCategories = [
     'Salary',
     'Freelance',
@@ -108,13 +99,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     'Other'
   ];
   final List<String> expenseCategories = [
-    'Food',
-    'Transport',
-    'Entertainment',
-    'Utilities',
-    'Healthcare',
-    'Shopping',
-    'Other'
+    '🏠 Housing',
+    '🍚 Food',
+    '🚗 Transportation',
+    '💡 Utilities',
+    '🏥 Healthcare'
   ];
 
   @override
@@ -129,9 +118,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     ];
     _loadRecentTransactions();
     _scrollToBottom();
-
-    // Initialize speech to text
-    _speech = stt.SpeechToText();
   }
 
   Future<void> _loadRecentTransactions() async {
@@ -164,7 +150,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 category: transaction.category,
                 date: transaction.date,
                 type: transaction.type,
-                userMessage: transaction.description,
+                userMessage: transaction.userMessage ??
+                    transaction
+                        .description, // Use original user message if available
               ),
             );
           }
@@ -203,61 +191,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _scrollToBottom();
   }
 
-  // Speech to text methods
-  void _listen() async {
-    if (!_isListening) {
-      // Request microphone permission
-      var status = await Permission.microphone.request();
-      if (status != PermissionStatus.granted) {
-        _addChatMessage('Microphone permission is required for voice input',
-            ChatMessageType.assistant);
-        return;
-      }
-
-      bool available = await _speech.initialize(
-        onStatus: (val) {
-          print('onStatus: $val');
-          if (val == 'done') {
-            setState(() => _isListening = false);
-          }
-        },
-        onError: (val) {
-          print('onError: $val');
-          setState(() => _isListening = false);
-        },
-      );
-      if (available) {
-        setState(() {
-          _isListening = true;
-          _speechText = ''; // Clear previous speech text
-        });
-        
-        // Convert locale format for iOS compatibility
-        String localeId = _speechLocale;
-        if (Platform.isIOS) {
-          // iOS uses locale format like 'en-US' not 'en_US'
-          localeId = _speechLocale.replaceAll('_', '-');
-        }
-        
-        _speech.listen(
-          onResult: (val) => setState(() {
-            _speechText = val.recognizedWords;
-            _aiMessageController.text = _speechText;
-          }),
-          listenFor: const Duration(seconds: 30),
-          pauseFor: const Duration(seconds: 5),
-          localeId: localeId,
-          listenOptions: stt.SpeechListenOptions(
-            partialResults: true,
-          ),
-        );
-      } else {
-        _addChatMessage('Speech recognition is not available on this device',
-            ChatMessageType.assistant);
-      }
-    }
-  }
-
   Future<void> _handleAddTransaction() async {
     final description = _descriptionController.text.trim();
     final amountStr = _amountController.text.trim();
@@ -294,6 +227,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       category: _selectedCategory,
       date: _selectedDate,
       createdAt: DateTime.now(),
+      userMessage:
+          description, // For manual entry, use description as user message
     );
 
     final provider = context.read<TransactionProvider>();
@@ -361,6 +296,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       } else {
         final description = result['description'] ?? '';
         final amount = result['amount'] ?? '';
+        final category = result['category'] ?? _selectedCategory;
 
         if (description.isNotEmpty && amount.isNotEmpty) {
           // Parse amount for database storage
@@ -377,6 +313,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             return;
           }
 
+          // Validate category
+          final categories = _selectedType == TransactionType.income
+              ? incomeCategories
+              : expenseCategories;
+          final validCategory =
+              categories.contains(category) ? category : _selectedCategory;
+
           // Create transaction object for database
           final transaction = Transaction(
             id: '',
@@ -384,9 +327,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             description: description,
             amount: parsedAmount,
             type: _selectedType,
-            category: _selectedCategory,
+            category: validCategory,
             date: _selectedDate,
             createdAt: DateTime.now(),
+            userMessage: userInputMessage, // Preserve the original user input
           );
 
           // Save to database
@@ -407,7 +351,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               TransactionRecord(
                 description: description,
                 amount: parsedAmount,
-                category: _selectedCategory,
+                category: validCategory,
                 date: _selectedDate,
                 type: _selectedType,
                 userMessage: userInputMessage,
@@ -444,258 +388,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         });
       }
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final categories = _selectedType == TransactionType.income
-        ? incomeCategories
-        : expenseCategories;
-
-    if (!categories.contains(_selectedCategory)) {
-      _selectedCategory = categories.first;
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Add Transaction',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          // Chat Messages Area with Completed Transactions
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount:
-                  _chatMessages.length + (_completedTransactions.length * 2),
-              itemBuilder: (context, index) {
-                // All chat messages first
-                if (index < _chatMessages.length) {
-                  return _buildChatBubble(_chatMessages[index]);
-                }
-
-                // All completed transactions (each has user message + transaction card)
-                int remaining = index - _chatMessages.length;
-                int transNum = remaining ~/ 2;
-                // Order so newest transactions appear at the bottom
-
-                if (remaining % 2 == 0) {
-                  // Show user message for this transaction
-                  return _buildChatBubble(
-                    ChatMessage(
-                      type: ChatMessageType.user,
-                      text: _completedTransactions[transNum].userMessage,
-                    ),
-                  );
-                } else {
-                  // Show transaction card for this transaction
-                  return _buildCompletedTransactionCard(
-                      _completedTransactions[transNum]);
-                }
-              },
-            ),
-          ),
-          // Current in-progress transaction (if exists)
-          if (_descriptionController.text.isNotEmpty ||
-              _amountController.text.isNotEmpty)
-            SingleChildScrollView(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  children: [
-                    _buildChatBubble(
-                      ChatMessage(
-                        type: ChatMessageType.user,
-                        text: _aiMessageController.text.isNotEmpty
-                            ? _aiMessageController.text
-                            : '',
-                      ),
-                    ),
-                    _buildTransactionCard(),
-                  ],
-                ),
-              ),
-            ),
-          // Suggested Input Area
-          if (_descriptionController.text.isNotEmpty ||
-              _amountController.text.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'dinner 50, shopping 200',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-          // Input Area
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Colors.grey[200]!),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Quick entry input
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Colors.grey[300]!,
-                            width: 1,
-                          ),
-                        ),
-                        child: TextField(
-                          controller: _aiMessageController,
-                          decoration: InputDecoration(
-                            hintText: _isListening
-                                ? 'Listening... Speak now'
-                                : 'e.g., "va xe 30k"',
-                            hintStyle: TextStyle(
-                              color:
-                                  _isListening ? Colors.red : Colors.grey[400],
-                              fontSize: 14,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                          maxLines: 1,
-                          enabled: !_isParsingAI,
-                          onSubmitted:
-                              _isParsingAI ? null : (_) => _parseAIMessage(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Voice and camera buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _isListening ? Colors.red : Colors.black,
-                      ),
-                      child: IconButton(
-                        onPressed: _listen,
-                        icon: Icon(
-                          _isListening ? Icons.mic_off : Icons.mic,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.black,
-                      ),
-                      child: IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.camera_alt, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Language selector for speech
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.grey[300]!,
-                      width: 1,
-                    ),
-                  ),
-                  child: DropdownButton<String>(
-                    value: _speechLocale,
-                    isExpanded: true,
-                    underline: const SizedBox(),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'en_US',
-                        child: Text('English (US)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'vi_VN',
-                        child: Text('Tiếng Việt (Vietnamese)'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _speechLocale = value;
-                          if (_isListening) {
-                            _speech.stop();
-                          }
-                        });
-                        _addChatMessage(
-                          'Speech language changed to ${value == 'vi_VN' ? 'Vietnamese' : 'English'}',
-                          ChatMessageType.assistant,
-                        );
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Set custom rules
-                TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    'Set custom rules',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 13,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildChatBubble(ChatMessage message) {
@@ -780,7 +472,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: Colors.grey[200]!),
+          border: Border.all(color: Colors.grey[200] ?? Colors.grey),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -894,7 +586,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: Colors.grey[200]!),
+          border: Border.all(color: Colors.grey[200] ?? Colors.grey),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -979,6 +671,201 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = _selectedType == TransactionType.income
+        ? incomeCategories
+        : expenseCategories;
+
+    if (!categories.contains(_selectedCategory)) {
+      _selectedCategory = categories.first;
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Add Transaction',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          // Chat Messages Area with Completed Transactions
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              itemCount:
+                  _chatMessages.length + (_completedTransactions.length * 2),
+              itemBuilder: (context, index) {
+                // All chat messages first
+                if (index < _chatMessages.length) {
+                  return _buildChatBubble(_chatMessages[index]);
+                }
+
+                // All completed transactions (each has user message + transaction card)
+                int remaining = index - _chatMessages.length;
+                int transNum = remaining ~/ 2;
+                // Order so newest transactions appear at the bottom
+
+                if (remaining % 2 == 0) {
+                  // Show user message for this transaction
+                  return _buildChatBubble(
+                    ChatMessage(
+                      type: ChatMessageType.user,
+                      text: _completedTransactions[transNum].userMessage,
+                    ),
+                  );
+                } else {
+                  // Show transaction card for this transaction
+                  return _buildCompletedTransactionCard(
+                      _completedTransactions[transNum]);
+                }
+              },
+            ),
+          ),
+          // Current in-progress transaction (if exists)
+          if (_descriptionController.text.isNotEmpty ||
+              _amountController.text.isNotEmpty)
+            SingleChildScrollView(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  children: [
+                    _buildChatBubble(
+                      ChatMessage(
+                        type: ChatMessageType.user,
+                        text: _aiMessageController.text.isNotEmpty
+                            ? _aiMessageController.text
+                            : '',
+                      ),
+                    ),
+                    _buildTransactionCard(),
+                  ],
+                ),
+              ),
+            ),
+          // Suggested Input Area
+          if (_descriptionController.text.isNotEmpty ||
+              _amountController.text.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'dinner 50, shopping 200',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          // Input Area
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                top: BorderSide(color: Colors.grey[200] ?? Colors.grey),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Quick entry input
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100] ?? Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Colors.grey[300] ?? Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _aiMessageController,
+                          decoration: InputDecoration(
+                            hintText: 'e.g., "va xe 30k"',
+                            hintStyle: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 14,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          maxLines: 1,
+                          enabled: !_isParsingAI,
+                          onSubmitted: _isParsingAI
+                              ? null
+                              : (_) {
+                                  _parseAIMessage();
+                                },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black,
+                      ),
+                      child: IconButton(
+                        onPressed: _isParsingAI
+                            ? null
+                            : () {
+                                _parseAIMessage();
+                              },
+                        icon: const Icon(
+                          Icons.send,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Set custom rules
+                TextButton(
+                  onPressed: () {},
+                  child: const Text(
+                    'Set custom rules',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 13,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

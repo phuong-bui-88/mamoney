@@ -219,8 +219,13 @@ void main() {
 
     test('should handle different categories for expenses', () {
       final now = DateTime.now();
-      final categories = ['Food', 'Transport', 'Entertainment', 'Utilities',
-                         'Healthcare', 'Shopping', 'Other'];
+      final categories = [
+        '🏠 Housing',
+        '🍚 Food',
+        '🚗 Transportation',
+        '💡 Utilities',
+        '🏥 Healthcare'
+      ];
 
       for (final category in categories) {
         final record = TransactionRecord(
@@ -258,20 +263,21 @@ void main() {
   group('AddTransactionScreen Constants', () {
     test('should have correct expense categories', () {
       const expectedExpenseCategories = [
-        'Food',
-        'Transport',
-        'Entertainment',
-        'Utilities',
-        'Healthcare',
-        'Shopping',
-        'Other'
+        '🏠 Housing',
+        '🍚 Food',
+        '🚗 Transportation',
+        '💡 Utilities',
+        '🏥 Healthcare'
       ];
 
       // We can't directly access the private state variable,
       // but we can verify the categories are defined correctly
-      expect(expectedExpenseCategories.length, 7);
-      expect(expectedExpenseCategories.contains('Food'), isTrue);
-      expect(expectedExpenseCategories.contains('Transport'), isTrue);
+      expect(expectedExpenseCategories.length, 5);
+      expect(expectedExpenseCategories.contains('🏠 Housing'), isTrue);
+      expect(expectedExpenseCategories.contains('🍚 Food'), isTrue);
+      expect(expectedExpenseCategories.contains('🚗 Transportation'), isTrue);
+      expect(expectedExpenseCategories.contains('💡 Utilities'), isTrue);
+      expect(expectedExpenseCategories.contains('🏥 Healthcare'), isTrue);
     });
 
     test('should have correct income categories', () {

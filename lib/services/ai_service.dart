@@ -45,9 +45,11 @@ class AIService {
           {
             'role': 'system',
             'content': 'You are a financial assistant that extracts transaction details from user messages. '
-                'Extract the description (what was bought/earned) and the amount (number only). '
+                'Extract the description (what was bought/earned), the amount (number only), and the category. '
+                'Categories for expenses: 🏠 Housing (rent, mortgage, maintenance), 🍚 Food (meals, groceries), 🚗 Transportation (fuel, transport), 💡 Utilities (electricity, water, internet, phone), 🏥 Healthcare (medicine, doctor, insurance). '
+                'Categories for income: Salary, Freelance, Investment, Gift, Other. '
                 'Convert Vietnamese number notation: k = thousands (50k = 50000), m = millions (1m = 1000000), tr = millions (2tr = 2000000). '
-                'Return response in format: DESCRIPTION: [description] | AMOUNT: [amount]'
+                'Return response in format: DESCRIPTION: [description] | AMOUNT: [amount] | CATEGORY: [category]'
           },
           {
             'role': 'user',
@@ -95,17 +97,19 @@ class AIService {
         'Provide description and amount only.';
   }
 
-  /// Extract description and amount from AI response
+  /// Extract description, amount, and category from AI response
   static Map<String, String> _extractDescriptionAndAmount(String response) {
     final result = <String, String>{};
 
-    // Look for pattern: DESCRIPTION: ... | AMOUNT: ...
+    // Look for pattern: DESCRIPTION: ... | AMOUNT: ... | CATEGORY: ...
     final descRegex = RegExp(r'DESCRIPTION:\s*([^|]+)', caseSensitive: false);
     final amountRegex =
         RegExp(r'AMOUNT:\s*(\d+(?:\.\d+)?)', caseSensitive: false);
+    final categoryRegex = RegExp(r'CATEGORY:\s*([^|]+)', caseSensitive: false);
 
     final descMatch = descRegex.firstMatch(response);
     final amountMatch = amountRegex.firstMatch(response);
+    final categoryMatch = categoryRegex.firstMatch(response);
 
     if (descMatch != null) {
       result['description'] = descMatch.group(1)?.trim() ?? '';
@@ -113,6 +117,10 @@ class AIService {
 
     if (amountMatch != null) {
       result['amount'] = amountMatch.group(1)?.trim() ?? '';
+    }
+
+    if (categoryMatch != null) {
+      result['category'] = categoryMatch.group(1)?.trim() ?? '';
     }
 
     // If patterns not found, try alternative parsing
@@ -141,6 +149,11 @@ class AIService {
           if (amount.isNotEmpty) {
             result['amount'] = amount;
           }
+        }
+      } else if (line.toLowerCase().contains('category')) {
+        final parts = line.split(':');
+        if (parts.length > 1) {
+          result['category'] = parts.sublist(1).join(':').trim();
         }
       }
     }

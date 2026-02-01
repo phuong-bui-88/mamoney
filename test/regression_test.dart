@@ -4,6 +4,7 @@ import 'package:mamoney/services/ai_service.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 
 /// Regression tests to prevent known issues from reoccurring
 /// These tests verify specific bug fixes and edge cases that were problematic

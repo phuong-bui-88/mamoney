@@ -11,6 +11,7 @@ class Transaction {
   final String category;
   final DateTime date;
   final DateTime createdAt;
+  final String? userMessage; // Original user input message
 
   Transaction({
     required this.id,
@@ -21,6 +22,7 @@ class Transaction {
     required this.category,
     required this.date,
     required this.createdAt,
+    this.userMessage,
   });
 
   // Convert Transaction to JSON
@@ -34,6 +36,7 @@ class Transaction {
       'category': category,
       'date': Timestamp.fromDate(date),
       'createdAt': Timestamp.fromDate(createdAt),
+      'userMessage': userMessage,
     };
   }
 
@@ -50,6 +53,7 @@ class Transaction {
       category: map['category'] ?? '',
       date: (map['date'] as Timestamp).toDate(),
       createdAt: (map['createdAt'] as Timestamp).toDate(),
+      userMessage: map['userMessage'],
     );
   }
 
@@ -63,6 +67,7 @@ class Transaction {
     String? category,
     DateTime? date,
     DateTime? createdAt,
+    String? userMessage,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -73,6 +78,7 @@ class Transaction {
       category: category ?? this.category,
       date: date ?? this.date,
       createdAt: createdAt ?? this.createdAt,
+      userMessage: userMessage ?? this.userMessage,
     );
   }
 

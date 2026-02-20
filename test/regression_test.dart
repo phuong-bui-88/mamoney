@@ -3,7 +3,6 @@ import 'package:mamoney/screens/add_transaction_screen.dart';
 import 'package:mamoney/services/ai_service.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/utils/currency_utils.dart';
-import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 
 /// Regression tests to prevent known issues from reoccurring
@@ -88,10 +87,10 @@ void main() {
       });
 
       test('REGRESSION: Should handle special characters in description', () {
-        const response =
-            'DESCRIPTION: Coffee @ café #1 (50% off) | AMOUNT: 25';
+        const response = 'DESCRIPTION: Coffee @ café #1 (50% off) | AMOUNT: 25';
 
-        final descRegex = RegExp(r'DESCRIPTION:\s*([^|]+)', caseSensitive: false);
+        final descRegex =
+            RegExp(r'DESCRIPTION:\s*([^|]+)', caseSensitive: false);
         final match = descRegex.firstMatch(response);
 
         expect(match?.group(1)?.trim(), contains('@'));
@@ -111,7 +110,8 @@ void main() {
     });
 
     group('Transaction Model Regressions', () {
-      test('REGRESSION: Should preserve exact amount through serialization', () {
+      test('REGRESSION: Should preserve exact amount through serialization',
+          () {
         final original = Transaction(
           id: '1',
           userId: 'user1',
@@ -204,8 +204,7 @@ void main() {
     });
 
     group('Integration Regressions', () {
-      test(
-          'REGRESSION: Formatter should work with typical user input sequence',
+      test('REGRESSION: Formatter should work with typical user input sequence',
           () {
         final formatter = ThousandsSeparatorInputFormatter();
 

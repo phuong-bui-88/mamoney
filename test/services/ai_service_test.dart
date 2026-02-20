@@ -1,8 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mamoney/services/ai_service.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
-import 'dart:convert';
 
 void main() {
   group('AIService', () {
@@ -22,8 +19,8 @@ void main() {
       test('should extract description and amount from standard format', () {
         const response = 'DESCRIPTION: Bought lunch | AMOUNT: 50';
 
-        final result = AIService.parseTransactionMessage('test')
-            .then((value) => value);
+        final result =
+            AIService.parseTransactionMessage('test').then((value) => value);
 
         // Test the extraction logic by simulating the response
         final extracted = _simulateExtraction(response);
@@ -142,8 +139,8 @@ void main() {
       });
 
       test('should handle message with special characters', () async {
-        final result = await AIService.parseTransactionMessage(
-            'Bought @#\$% for 50!');
+        final result =
+            await AIService.parseTransactionMessage('Bought @#\$% for 50!');
 
         expect(result, isA<Map<String, String>>());
       });

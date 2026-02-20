@@ -9,6 +9,8 @@ Get your money management app running in 5 minutes!
 ✅ **Dev Containers Extension** installed (ms-vscode-remote.remote-containers)  
 ✅ **Google Account** (for Firebase)
 
+> **Note:** ADB is configured only in the dev container. Host Flutter doctor will show "Unable to locate Android SDK" which is expected. Use the provided `flutter-in-container.sh` script for all Flutter commands that need Android/ADB functionality.
+
 ## Step 1: Open in DevContainer (1 minute)
 
 1. Open `/mamoney` folder in VS Code
@@ -34,6 +36,13 @@ Open terminal in VS Code (container is already active):
 ```bash
 flutter pub get
 flutter run -d web
+```
+
+Alternatively, if running from the host terminal, use the provided script:
+
+```bash
+./flutter-in-container.sh pub get
+./flutter-in-container.sh run -d web
 ```
 
 ✨ **Done!** App will open at `http://localhost:8080`

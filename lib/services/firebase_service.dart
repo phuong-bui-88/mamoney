@@ -61,13 +61,13 @@ class FirebaseService {
       // Create user document in Firestore
       if (userCredential.user != null) {
         await _firestore.collection('users').doc(userCredential.user!.uid).set(
-          User(
-            id: userCredential.user!.uid,
-            email: email,
-            displayName: userCredential.user!.displayName,
-            createdAt: DateTime.now(),
-          ).toMap(),
-        );
+              User(
+                id: userCredential.user!.uid,
+                email: email,
+                displayName: userCredential.user!.displayName,
+                createdAt: DateTime.now(),
+              ).toMap(),
+            );
       }
 
       return userCredential.user;
@@ -115,14 +115,13 @@ class FirebaseService {
       if (uid == null) {
         throw Exception('User not authenticated');
       }
-      final transactionWithId =
-          transaction.copyWith(id: id, userId: uid);
-      
+      final transactionWithId = transaction.copyWith(id: id, userId: uid);
+
       await _firestore
           .collection('transactions')
           .doc(id)
           .set(transactionWithId.toMap());
-      
+
       return id;
     } catch (e) {
       rethrow;
@@ -132,18 +131,25 @@ class FirebaseService {
   // Get transactions for current user
   Stream<List<models.Transaction>> getTransactionsStream() {
     if (currentUser == null) {
+      print('[DEBUG] No current user. Returning empty transaction stream.');
       return Stream.value([]);
     }
 
+    print('[DEBUG] Fetching transactions for userId: \'${currentUser!.uid}\'');
     return _firestore
         .collection('transactions')
         .where('userId', isEqualTo: currentUser!.uid)
         .orderBy('date', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
+      final txs = snapshot.docs
           .map((doc) => models.Transaction.fromMap(doc.data()))
           .toList();
+      print('[DEBUG] Fetched transactions count: \'${txs.length}\'');
+      for (final tx in txs) {
+        print('[DEBUG] Transaction: \'${tx.toString()}\'');
+      }
+      return txs;
     });
   }
 

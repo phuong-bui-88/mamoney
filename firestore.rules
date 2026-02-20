@@ -1,20 +1,9 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to create their own user document during signup
-    match /users/{userId} {
-      allow read: if request.auth.uid == userId;
-      allow create: if request.auth.uid == userId && request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
-      allow delete: if request.auth.uid == userId;
-    }
-    
-    // Allow users to read and write their own transactions
-    match /transactions/{transactionId} {
-      allow read: if request.auth.uid == resource.data.userId;
-      allow create: if request.auth.uid == request.resource.data.userId;
-      allow update: if request.auth.uid == resource.data.userId;
-      allow delete: if request.auth.uid == resource.data.userId;
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

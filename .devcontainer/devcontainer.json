@@ -32,12 +32,9 @@
     }
   },
   "remoteEnv": {
-    "ADB_SERVER_SOCKET": "tcp:127.0.0.1:5037",
-    "ADB_HOST": "127.0.0.1",
-    "ADB_PORT": "5037",
     "ANDROID_HOME": "/opt/android-sdk",
     "ANDROID_SDK_ROOT": "/opt/android-sdk",
-    "PATH": "/opt/android-sdk/platform-tools:/usr/local/flutter/bin:/usr/local/flutter/bin/cache/dart-sdk/bin:$PATH"
+    "PATH": "/opt/android-sdk/platform-tools:/usr/local/flutter/bin:/usr/local/flutter/bin/cache/dart-sdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   },
-  "postCreateCommand": "flutter doctor && echo 'Use Windows ADB: adb devices should list emulator'"
+  "postCreateCommand": "adb start-server && flutter doctor && echo 'Use Windows ADB: adb devices should list emulator'"
 }

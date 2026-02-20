@@ -35,6 +35,8 @@ class TransactionProvider extends ChangeNotifier {
 
     final transactionStream = _firebaseService.getTransactionsStream();
     _transactionSubscription = transactionStream.listen((transactions) {
+      print(
+          '[DEBUG] TransactionProvider received ${transactions.length} transactions');
       // Sort transactions by createdAt in descending order
       transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _transactions = transactions;

@@ -29,6 +29,71 @@ void main() {
         expect(extracted['amount'], '50');
       });
 
+      test('should extract description, amount, and category', () {
+        const response =
+            'DESCRIPTION: Bought lunch | AMOUNT: 50 | CATEGORY: 🍚 Food';
+
+        final extracted = _simulateExtraction(response);
+
+        expect(extracted['description'], 'Bought lunch');
+        expect(extracted['amount'], '50');
+        expect(extracted['category'], '🍚 Food');
+      });
+
+      test('should extract category for Housing', () {
+        const response =
+            'DESCRIPTION: Rent payment | AMOUNT: 5000000 | CATEGORY: 🏠 Housing';
+
+        final extracted = _simulateExtraction(response);
+
+        expect(extracted['category'], '🏠 Housing');
+      });
+
+      test('should extract category for Transportation', () {
+        const response =
+            'DESCRIPTION: Gas | AMOUNT: 50000 | CATEGORY: 🚗 Transportation';
+
+        final extracted = _simulateExtraction(response);
+
+        expect(extracted['category'], '🚗 Transportation');
+      });
+
+      test('should extract category for Utilities', () {
+        const response =
+            'DESCRIPTION: Electric bill | AMOUNT: 200000 | CATEGORY: 💡 Utilities';
+
+        final extracted = _simulateExtraction(response);
+
+        expect(extracted['category'], '💡 Utilities');
+      });
+
+      test('should extract category for Healthcare', () {
+        const response =
+            'DESCRIPTION: Medicine | AMOUNT: 150000 | CATEGORY: 🏥 Healthcare';
+
+        final extracted = _simulateExtraction(response);
+
+        expect(extracted['category'], '🏥 Healthcare');
+      });
+
+      test('should extract income category - Salary', () {
+        const response =
+            'DESCRIPTION: Monthly salary | AMOUNT: 15000000 | CATEGORY: Salary';
+
+        final extracted = _simulateExtraction(response);
+
+        expect(extracted['category'], 'Salary');
+      });
+
+      test('should extract income category - Freelance', () {
+        const response =
+            'DESCRIPTION: Freelance project | AMOUNT: 5000000 | CATEGORY: Freelance';
+
+        final extracted = _simulateExtraction(response);
+
+        expect(extracted['category'], 'Freelance');
+      });
+
       test('should extract from case-insensitive format', () {
         const response = 'description: Coffee | amount: 5.50';
 
@@ -211,9 +276,11 @@ Map<String, String> _simulateExtraction(String response) {
   final descRegex = RegExp(r'DESCRIPTION:\s*([^|]+)', caseSensitive: false);
   final amountRegex =
       RegExp(r'AMOUNT:\s*(\d+(?:\.\d+)?)', caseSensitive: false);
+  final categoryRegex = RegExp(r'CATEGORY:\s*([^|]+)', caseSensitive: false);
 
   final descMatch = descRegex.firstMatch(response);
   final amountMatch = amountRegex.firstMatch(response);
+  final categoryMatch = categoryRegex.firstMatch(response);
 
   if (descMatch != null) {
     result['description'] = descMatch.group(1)?.trim() ?? '';
@@ -221,6 +288,10 @@ Map<String, String> _simulateExtraction(String response) {
 
   if (amountMatch != null) {
     result['amount'] = amountMatch.group(1)?.trim() ?? '';
+  }
+
+  if (categoryMatch != null) {
+    result['category'] = categoryMatch.group(1)?.trim() ?? '';
   }
 
   // If patterns not found, try alternative parsing
@@ -240,6 +311,11 @@ Map<String, String> _simulateExtraction(String response) {
           if (amount.isNotEmpty) {
             result['amount'] = amount;
           }
+        }
+      } else if (line.toLowerCase().contains('category')) {
+        final parts = line.split(':');
+        if (parts.length > 1) {
+          result['category'] = parts.sublist(1).join(':').trim();
         }
       }
     }

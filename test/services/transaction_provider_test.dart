@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mamoney/services/transaction_provider.dart';
 import 'package:mamoney/models/transaction.dart';
-import 'package:mamoney/services/firebase_service.dart';
 
 void main() {
   group('TransactionProvider', () {

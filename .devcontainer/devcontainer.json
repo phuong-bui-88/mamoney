@@ -25,19 +25,10 @@
     "8081": {
       "label": "Flutter Web App",
       "onAutoForward": "notify"
-    },
-    "5037": {
-      "label": "ADB Server",
-      "onAutoForward": "silent"
     }
   },
   "remoteEnv": {
-    "ADB_SERVER_SOCKET": "tcp:127.0.0.1:5037",
-    "ADB_HOST": "127.0.0.1",
-    "ADB_PORT": "5037",
-    "ANDROID_HOME": "/opt/android-sdk",
-    "ANDROID_SDK_ROOT": "/opt/android-sdk",
-    "PATH": "/opt/android-sdk/platform-tools:/usr/local/flutter/bin:/usr/local/flutter/bin/cache/dart-sdk/bin:$PATH"
+    "PATH": "/usr/local/flutter/bin:/usr/local/flutter/bin/cache/dart-sdk/bin:/usr/bin:/bin:$PATH"
   },
-  "postCreateCommand": "flutter doctor && echo 'Use Windows ADB: adb devices should list emulator'"
+  "postCreateCommand": "flutter doctor"
 }

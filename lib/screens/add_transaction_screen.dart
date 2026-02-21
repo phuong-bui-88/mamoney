@@ -451,13 +451,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     // Select emoji based on description
     String getEmoji() {
       final description = record.description.toLowerCase();
-      if (description.contains('car') || description.contains('xe'))
+      if (description.contains('car') || description.contains('xe')) {
         return '🚗';
-      if (description.contains('food') || description.contains('eat'))
+      }
+      if (description.contains('food') || description.contains('eat')) {
         return '🍽️';
+      }
       if (description.contains('shop')) return '🛍️';
       if (description.contains('movie') ||
-          description.contains('entertainment')) return '🎬';
+          description.contains('entertainment')) {
+        return '🎬';
+      }
       if (description.contains('game')) return '🎮';
       if (record.type == TransactionType.expense) return '🛒';
       return '💰';
@@ -567,13 +571,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     // Select emoji based on category
     String getEmoji() {
       final description = _descriptionController.text.toLowerCase();
-      if (description.contains('car') || description.contains('xe'))
+      if (description.contains('car') || description.contains('xe')) {
         return '🚗';
-      if (description.contains('food') || description.contains('eat'))
+      }
+      if (description.contains('food') || description.contains('eat')) {
         return '🍽️';
+      }
       if (description.contains('shop')) return '🛍️';
       if (description.contains('movie') ||
-          description.contains('entertainment')) return '🎬';
+          description.contains('entertainment')) {
+        return '🎬';
+      }
       if (description.contains('game')) return '🎮';
       if (_selectedType == TransactionType.expense) return '🛒';
       return '💰';
@@ -831,7 +839,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     Container(
                       width: 48,
                       height: 48,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.black,
                       ),

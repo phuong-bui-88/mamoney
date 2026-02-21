@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:mamoney/services/transaction_provider.dart';
 import 'package:mamoney/services/auth_provider.dart';
 import 'package:intl/intl.dart';
-import 'package:mamoney/utils/currency_utils.dart';
 
 class TransactionListScreen extends StatefulWidget {
   const TransactionListScreen({super.key});

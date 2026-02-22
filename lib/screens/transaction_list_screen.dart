@@ -6,6 +6,7 @@ import 'package:mamoney/services/auth_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:mamoney/screens/edit_transaction_screen.dart';
+import 'package:mamoney/screens/add_transaction_screen.dart';
 
 class TransactionListScreen extends StatefulWidget {
   const TransactionListScreen({super.key});
@@ -325,6 +326,17 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
             ],
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddTransactionScreen(),
+            ),
+          );
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }

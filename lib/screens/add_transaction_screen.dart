@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/services/transaction_provider.dart';
@@ -69,9 +68,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final List<TransactionRecord> _completedTransactions = [];
   bool _isParsingAI = false;
   bool _isSavingTransaction = false;
-  bool _addThousands = false;
 
-  final TransactionType _selectedType = TransactionType.expense;
+  late TransactionType _selectedType;
   String _selectedCategory = '';
   final DateTime _selectedDate = DateTime.now();
 
@@ -82,7 +80,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _amountController = TextEditingController();
     _aiMessageController = TextEditingController();
     _scrollController = ScrollController();
-
+    _selectedType = TransactionType.expense;
     _selectedCategory = expenseCategories[0];
   }
 
@@ -141,6 +139,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     try {
       final result = await AIService.parseTransactionMessage(userInputMessage);
 
+      print('=== DEBUG: AI Result 123 ===');
+      print('Result type: ${result.runtimeType}');
+      print('Result keys: ${result.keys.toList()}');
+      print('Full result: $result');
+
+      if (result.containsKey('error')) {
+        print('Error found: ${result['error']}');
+      } else {
+        print('Description: ${result['description']}');
+        print('Amount: ${result['amount']}');
+        print('Category: ${result['category'] ?? "NOT PROVIDED"}');
+        print('Type: ${result['type'] ?? "NOT PROVIDED"}');
+      }
+      print('======================');
+
       if (!mounted) return;
 
       if (result.containsKey('error')) {
@@ -152,16 +165,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         final description = result['description'] ?? '';
         final amount = result['amount'] ?? '';
         final category = result['category'] ?? _selectedCategory;
+        final type = result['type'] ?? 'expense';
+
+        // Update selected type based on AI result
+        if (type.toLowerCase() == 'income') {
+          _selectedType = TransactionType.income;
+        } else {
+          _selectedType = TransactionType.expense;
+        }
+
+        print('Detected type from AI: $type -> $_selectedType');
 
         if (description.isNotEmpty && amount.isNotEmpty) {
           // Parse amount for database storage
           final cleanAmount = amount.replaceAll(',', '');
           var parsedAmount = double.tryParse(cleanAmount) ?? 0;
-
-          // Apply thousand multiplier if enabled
-          if (_addThousands) {
-            parsedAmount = parsedAmount * 1000;
-          }
 
           // Ensure user is signed in
           final uid = FirebaseService().currentUser?.uid;
@@ -308,21 +326,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   Widget _buildCompletedTransactionCard(TransactionRecord record) {
-    // Select emoji based on description
+    // Select emoji from category (extract emoji before space)
     String getEmoji() {
-      final description = record.description.toLowerCase();
-      if (description.contains('car') || description.contains('xe')) {
-        return '🚗';
+      if (record.category.isNotEmpty) {
+        // Category format: "🍚 Food", extract part before space
+        final spaceIndex = record.category.indexOf(' ');
+        if (spaceIndex > 0) {
+          return record.category.substring(0, spaceIndex).trim();
+        }
       }
-      if (description.contains('food') || description.contains('eat')) {
-        return '🍽️';
-      }
-      if (description.contains('shop')) return '🛍️';
-      if (description.contains('movie') ||
-          description.contains('entertainment')) {
-        return '🎬';
-      }
-      if (description.contains('game')) return '🎮';
+      // Fallback to default
       if (record.type == TransactionType.expense) return '🛒';
       return '💰';
     }
@@ -394,14 +407,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           color: Colors.black,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        record.category,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -428,21 +433,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final cleanAmountStr = amountStr.replaceAll(',', '');
     final amount = double.tryParse(cleanAmountStr) ?? 0;
 
-    // Select emoji based on category
+    // Select emoji from category (extract emoji before space)
     String getEmoji() {
-      final description = _descriptionController.text.toLowerCase();
-      if (description.contains('car') || description.contains('xe')) {
-        return '🚗';
+      if (_selectedCategory.isNotEmpty) {
+        // Category format: "🍚 Food", extract part before space
+        final spaceIndex = _selectedCategory.indexOf(' ');
+        if (spaceIndex > 0) {
+          return _selectedCategory.substring(0, spaceIndex).trim();
+        }
       }
-      if (description.contains('food') || description.contains('eat')) {
-        return '🍽️';
-      }
-      if (description.contains('shop')) return '🛍️';
-      if (description.contains('movie') ||
-          description.contains('entertainment')) {
-        return '🎬';
-      }
-      if (description.contains('game')) return '🎮';
+      // Fallback to default
       if (_selectedType == TransactionType.expense) return '🛒';
       return '💰';
     }
@@ -718,48 +718,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Add 000 Toggle with Preview
-                Row(
-                  children: [
-                    Checkbox(
-                      tristate: false,
-                      value: _addThousands,
-                      onChanged: (bool? value) {
-                        setState(() {
-                          _addThousands = value ?? true;
-                        });
-                      },
-                    ),
-                    const Text(
-                      'Add 000',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    const Spacer(),
-                    // Preview
-                    if (_amountController.text.isNotEmpty)
-                      Text(
-                        () {
-                          String amountStr = _amountController.text.trim();
-                          if (amountStr.isEmpty) return '0 VND';
-
-                          // Remove commas to get pure digits
-                          amountStr = amountStr.replaceAll(',', '');
-                          final amount = double.tryParse(amountStr) ?? 0;
-
-                          // Apply thousand multiplier only if enabled
-                          final finalAmount =
-                              _addThousands ? amount * 1000 : amount;
-                          final formatter = NumberFormat('#,##0', 'en_US');
-                          return '${formatter.format(finalAmount)} VND';
-                        }(),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                  ],
-                ),
                 const SizedBox(height: 12),
                 // Set custom rules
                 TextButton(

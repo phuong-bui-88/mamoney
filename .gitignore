@@ -63,6 +63,9 @@ lib/services/firebase_config.dart
 # Firebase emulator
 firebase-debug.log
 
+# Firebase logs
+.firebase/logs/vsce-debug.log
+
 # Secrets
 *.pem
 *.key

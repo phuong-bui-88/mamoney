@@ -410,5 +410,219 @@ void main() {
         expect(provider.error, isNull);
       });
     });
+
+    group('Transaction Filtering', () {
+      test('should filter transactions by month by default', () {
+        final now = DateTime.now();
+        final currentMonth = now;
+        final nextMonth = DateTime(now.year, now.month + 1, 1);
+
+        final mockTransactions = [
+          // Current month
+          Transaction(
+            id: '1',
+            userId: 'user1',
+            description: 'Current month income',
+            amount: 1000,
+            type: TransactionType.income,
+            category: 'Salary',
+            date: currentMonth,
+            createdAt: currentMonth,
+          ),
+          // Next month
+          Transaction(
+            id: '2',
+            userId: 'user1',
+            description: 'Next month expense',
+            amount: 500,
+            type: TransactionType.expense,
+            category: 'Food',
+            date: nextMonth,
+            createdAt: nextMonth,
+          ),
+        ];
+
+        provider.transactions.addAll(mockTransactions);
+
+        expect(provider.filterType, FilterType.month);
+        expect(provider.filteredTransactions.length, 1);
+        expect(provider.filteredTransactions.first.description,
+            'Current month income');
+      });
+
+      test('should filter transactions by year when filterType is year', () {
+        final now = DateTime.now();
+        final currentYear = DateTime(now.year, 1, 1);
+        final nextYear = DateTime(now.year + 1, 1, 1);
+
+        final mockTransactions = [
+          // Current year
+          Transaction(
+            id: '1',
+            userId: 'user1',
+            description: 'Current year income',
+            amount: 1000,
+            type: TransactionType.income,
+            category: 'Salary',
+            date: currentYear,
+            createdAt: currentYear,
+          ),
+          // Next year
+          Transaction(
+            id: '2',
+            userId: 'user1',
+            description: 'Next year expense',
+            amount: 500,
+            type: TransactionType.expense,
+            category: 'Food',
+            date: nextYear,
+            createdAt: nextYear,
+          ),
+        ];
+
+        provider.transactions.addAll(mockTransactions);
+        provider.setFilterType(FilterType.year);
+
+        expect(provider.filterType, FilterType.year);
+        expect(provider.filteredTransactions.length, 1);
+        expect(provider.filteredTransactions.first.description,
+            'Current year income');
+      });
+
+      test('should calculate filtered total income correctly', () {
+        final now = DateTime.now();
+        final currentMonth = now;
+        final nextMonth = DateTime(now.year, now.month + 1, 1);
+
+        final mockTransactions = [
+          Transaction(
+            id: '1',
+            userId: 'user1',
+            description: 'Current month income',
+            amount: 1000,
+            type: TransactionType.income,
+            category: 'Salary',
+            date: currentMonth,
+            createdAt: currentMonth,
+          ),
+          Transaction(
+            id: '2',
+            userId: 'user1',
+            description: 'Next month income',
+            amount: 500,
+            type: TransactionType.income,
+            category: 'Bonus',
+            date: nextMonth,
+            createdAt: nextMonth,
+          ),
+        ];
+
+        provider.transactions.addAll(mockTransactions);
+
+        expect(provider.filteredTotalIncome, 1000);
+        expect(provider.totalIncome, 1500);
+      });
+
+      test('should calculate filtered total expense correctly', () {
+        final now = DateTime.now();
+        final currentMonth = now;
+        final nextMonth = DateTime(now.year, now.month + 1, 1);
+
+        final mockTransactions = [
+          Transaction(
+            id: '1',
+            userId: 'user1',
+            description: 'Current month expense',
+            amount: 300,
+            type: TransactionType.expense,
+            category: 'Food',
+            date: currentMonth,
+            createdAt: currentMonth,
+          ),
+          Transaction(
+            id: '2',
+            userId: 'user1',
+            description: 'Next month expense',
+            amount: 200,
+            type: TransactionType.expense,
+            category: 'Transport',
+            date: nextMonth,
+            createdAt: nextMonth,
+          ),
+        ];
+
+        provider.transactions.addAll(mockTransactions);
+
+        expect(provider.filteredTotalExpense, 300);
+        expect(provider.totalExpense, 500);
+      });
+
+      test('should calculate filtered balance correctly', () {
+        final now = DateTime.now();
+        final currentMonth = now;
+        final nextMonth = DateTime(now.year, now.month + 1, 1);
+
+        final mockTransactions = [
+          Transaction(
+            id: '1',
+            userId: 'user1',
+            description: 'Current month income',
+            amount: 1000,
+            type: TransactionType.income,
+            category: 'Salary',
+            date: currentMonth,
+            createdAt: currentMonth,
+          ),
+          Transaction(
+            id: '2',
+            userId: 'user1',
+            description: 'Current month expense',
+            amount: 300,
+            type: TransactionType.expense,
+            category: 'Food',
+            date: currentMonth,
+            createdAt: currentMonth,
+          ),
+          Transaction(
+            id: '3',
+            userId: 'user1',
+            description: 'Next month income',
+            amount: 500,
+            type: TransactionType.income,
+            category: 'Bonus',
+            date: nextMonth,
+            createdAt: nextMonth,
+          ),
+        ];
+
+        provider.transactions.addAll(mockTransactions);
+
+        expect(provider.filteredBalance, 700);
+        expect(provider.balance, 1200);
+      });
+
+      test('setSelectedDate should update the selected date', () {
+        final newDate = DateTime(2024, 5, 15);
+        provider.setSelectedDate(newDate);
+
+        expect(provider.selectedDate, newDate);
+      });
+
+      test('setFilterType should update the filter type', () {
+        expect(provider.filterType, FilterType.month);
+        provider.setFilterType(FilterType.year);
+        expect(provider.filterType, FilterType.year);
+      });
+
+      test('should handle empty filtered transactions', () {
+        final futureDate = DateTime(2099, 1, 1);
+        provider.setSelectedDate(futureDate);
+
+        expect(provider.filteredTransactions, isEmpty);
+        expect(provider.filteredTotalIncome, 0);
+        expect(provider.filteredTotalExpense, 0);
+        expect(provider.filteredBalance, 0);
+      });
+    });
   });
 }

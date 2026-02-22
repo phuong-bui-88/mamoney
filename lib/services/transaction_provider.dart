@@ -11,9 +11,28 @@ class TransactionProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription? _transactionSubscription;
 
+  // Filter state
+  FilterType _filterType = FilterType.month; // Default filter is by month
+  DateTime _selectedDate = DateTime.now();
+
   List<Transaction> get transactions => _transactions;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  FilterType get filterType => _filterType;
+  DateTime get selectedDate => _selectedDate;
+
+  // Get filtered transactions based on filter type and selected date
+  List<Transaction> get filteredTransactions {
+    return _transactions.where((transaction) {
+      if (_filterType == FilterType.month) {
+        return transaction.date.year == _selectedDate.year &&
+            transaction.date.month == _selectedDate.month;
+      } else {
+        // Filter by year
+        return transaction.date.year == _selectedDate.year;
+      }
+    }).toList();
+  }
 
   double get totalIncome => _transactions
       .where((t) => t.type == TransactionType.income)
@@ -24,6 +43,17 @@ class TransactionProvider extends ChangeNotifier {
       .fold(0, (sum, t) => sum + t.amount);
 
   double get balance => totalIncome - totalExpense;
+
+  // Filtered totals
+  double get filteredTotalIncome => filteredTransactions
+      .where((t) => t.type == TransactionType.income)
+      .fold(0, (sum, t) => sum + t.amount);
+
+  double get filteredTotalExpense => filteredTransactions
+      .where((t) => t.type == TransactionType.expense)
+      .fold(0, (sum, t) => sum + t.amount);
+
+  double get filteredBalance => filteredTotalIncome - filteredTotalExpense;
 
   TransactionProvider() {
     _initializeTransactionStream();
@@ -97,6 +127,16 @@ class TransactionProvider extends ChangeNotifier {
 
   List<Transaction> getTransactionsByCategory(String category) {
     return _transactions.where((t) => t.category == category).toList();
+  }
+
+  void setFilterType(FilterType filterType) {
+    _filterType = filterType;
+    notifyListeners();
+  }
+
+  void setSelectedDate(DateTime date) {
+    _selectedDate = date;
+    notifyListeners();
   }
 
   @override

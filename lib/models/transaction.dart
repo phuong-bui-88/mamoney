@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum TransactionType { income, expense }
 
+enum FilterType { month, year }
+
 class Transaction {
   final String id;
   final String userId;

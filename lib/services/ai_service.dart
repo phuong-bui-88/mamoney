@@ -45,11 +45,13 @@ class AIService {
           {
             'role': 'system',
             'content': 'You are a financial assistant that extracts transaction details from user messages. '
-                'Extract the description (what was bought/earned), the amount (number only), and the category. '
+                'Input format is typically: "[description] [amount]" (e.g., "sửa xe 15k" means description="sửa xe", amount="15000"). '
+                'Extract the description (keep it EXACTLY as the user provided but WITHOUT the amount), the amount (number only), the category, and the type. '
                 'Categories for expenses: 🏠 Housing (rent, mortgage, maintenance), 🍚 Food (meals, groceries), 🚗 Transportation (fuel, transport), 💡 Utilities (electricity, water, internet, phone), 🏥 Healthcare (medicine, doctor, insurance). '
                 'Categories for income: Salary, Freelance, Investment, Gift, Other. '
+                'Type is either "expense" or "income". Most transactions are expenses unless explicitly mentioned as earning/getting money (income keywords: salary, earned, received, gift, investment, freelance, bonus, refund). '
                 'Convert Vietnamese number notation: k = thousands (50k = 50000), m = millions (1m = 1000000), tr = millions (2tr = 2000000). '
-                'Return response in format: DESCRIPTION: [description] | AMOUNT: [amount] | CATEGORY: [category]'
+                'Return response in format: DESCRIPTION: [description] | AMOUNT: [amount] | CATEGORY: [category] | TYPE: [expense/income]'
           },
           {
             'role': 'user',
@@ -94,22 +96,24 @@ class AIService {
   /// Build prompt for AI
   static String _buildPrompt(String message) {
     return 'Extract transaction details from this message: "$message". '
-        'Provide description and amount only.';
+        'Return response in format: DESCRIPTION: [description] | AMOUNT: [amount] | CATEGORY: [category] | TYPE: [expense/income]';
   }
 
-  /// Extract description, amount, and category from AI response
+  /// Extract description, amount, category, and type from AI response
   static Map<String, String> _extractDescriptionAndAmount(String response) {
     final result = <String, String>{};
 
-    // Look for pattern: DESCRIPTION: ... | AMOUNT: ... | CATEGORY: ...
+    // Look for pattern: DESCRIPTION: ... | AMOUNT: ... | CATEGORY: ... | TYPE: ...
     final descRegex = RegExp(r'DESCRIPTION:\s*([^|]+)', caseSensitive: false);
     final amountRegex =
         RegExp(r'AMOUNT:\s*(\d+(?:\.\d+)?)', caseSensitive: false);
     final categoryRegex = RegExp(r'CATEGORY:\s*([^|]+)', caseSensitive: false);
+    final typeRegex = RegExp(r'TYPE:\s*(expense|income)', caseSensitive: false);
 
     final descMatch = descRegex.firstMatch(response);
     final amountMatch = amountRegex.firstMatch(response);
     final categoryMatch = categoryRegex.firstMatch(response);
+    final typeMatch = typeRegex.firstMatch(response);
 
     if (descMatch != null) {
       result['description'] = descMatch.group(1)?.trim() ?? '';
@@ -121,6 +125,10 @@ class AIService {
 
     if (categoryMatch != null) {
       result['category'] = categoryMatch.group(1)?.trim() ?? '';
+    }
+
+    if (typeMatch != null) {
+      result['type'] = typeMatch.group(1)?.trim() ?? '';
     }
 
     // If patterns not found, try alternative parsing
@@ -154,6 +162,14 @@ class AIService {
         final parts = line.split(':');
         if (parts.length > 1) {
           result['category'] = parts.sublist(1).join(':').trim();
+        }
+      } else if (line.toLowerCase().contains('type')) {
+        final parts = line.split(':');
+        if (parts.length > 1) {
+          final typeStr = parts.sublist(1).join(':').trim().toLowerCase();
+          if (typeStr.contains('expense') || typeStr.contains('income')) {
+            result['type'] = typeStr.contains('income') ? 'income' : 'expense';
+          }
         }
       }
     }

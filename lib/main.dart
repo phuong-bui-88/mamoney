@@ -6,12 +6,20 @@ import 'package:mamoney/services/firebase_service.dart';
 import 'package:mamoney/services/auth_provider.dart';
 import 'package:mamoney/services/transaction_provider.dart';
 import 'package:mamoney/screens/login_screen.dart';
-import 'package:mamoney/screens/home_screen.dart';
+// ...existing code...
+import 'package:logging/logging.dart';
+import 'package:mamoney/services/logging_service.dart';
+import 'package:mamoney/screens/main_navigation_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase only on supported platforms
+
+  // Set up logging using the reusable service
+  setupLogging();
+  final log = Logger('Main');
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -21,7 +29,7 @@ void main() async {
   } catch (e) {
     // Firebase not supported on this platform (e.g., Linux desktop)
     // The app will run without Firebase functionality
-    print('Firebase initialization failed: $e');
+    log.warning('Firebase initialization failed: $e');
   }
 
   runApp(const MyApp());
@@ -61,7 +69,8 @@ class AuthWrapper extends StatelessWidget {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
         if (authProvider.isAuthenticated) {
-          return const HomeScreen();
+          // Use MainNavigationScreen as the root after login
+          return const MainNavigationScreen();
         } else {
           return const LoginScreen();
         }

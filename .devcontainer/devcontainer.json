@@ -30,5 +30,5 @@
   "remoteEnv": {
     "PATH": "/usr/local/flutter/bin:/usr/local/flutter/bin/cache/dart-sdk/bin:/usr/bin:/bin:$PATH"
   },
-  "postCreateCommand": "flutter doctor"
+  "postCreateCommand": "flutter doctor && flutter pub get"
 }

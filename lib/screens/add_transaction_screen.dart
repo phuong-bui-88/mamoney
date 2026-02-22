@@ -35,37 +35,6 @@ class TransactionRecord {
   });
 }
 
-class ThousandsSeparatorInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    if (newValue.text.isEmpty) {
-      return newValue;
-    }
-
-    final text = newValue.text.replaceAll(',', '');
-
-    if (text.isEmpty) {
-      return newValue;
-    }
-
-    final formatter = NumberFormat('#,##0', 'en_US');
-    try {
-      final value = double.parse(text);
-      final formatted = formatter.format(value);
-
-      return TextEditingValue(
-        text: formatted,
-        selection: TextSelection.collapsed(offset: formatted.length),
-      );
-    } catch (e) {
-      return oldValue;
-    }
-  }
-}
-
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
 
@@ -74,23 +43,12 @@ class AddTransactionScreen extends StatefulWidget {
 }
 
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
-  final _descriptionController = TextEditingController();
-  final _amountController = TextEditingController();
-  final _aiMessageController = TextEditingController();
-  final _scrollController = ScrollController();
+  late TextEditingController _descriptionController;
+  late TextEditingController _amountController;
+  late TextEditingController _aiMessageController;
+  late ScrollController _scrollController;
 
-  final TransactionType _selectedType = TransactionType.expense;
-  String _selectedCategory = 'Food';
-  final DateTime _selectedDate = DateTime.now();
-  bool _isParsingAI = false;
-  bool _isSavingTransaction = false; // Prevent duplicate submissions
-
-  // Chat messages state
-  List<ChatMessage> _chatMessages = [];
-
-  // Completed transactions state
-  final List<TransactionRecord> _completedTransactions = [];
-
+  // Category definitions
   final List<String> incomeCategories = [
     'Salary',
     'Freelance',
@@ -98,6 +56,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     'Gift',
     'Other'
   ];
+
   final List<String> expenseCategories = [
     '🏠 Housing',
     '🍚 Food',
@@ -106,61 +65,25 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     '🏥 Healthcare'
   ];
 
+  final List<ChatMessage> _chatMessages = [];
+  final List<TransactionRecord> _completedTransactions = [];
+  bool _isParsingAI = false;
+  bool _isSavingTransaction = false;
+  bool _addThousands = false;
+
+  final TransactionType _selectedType = TransactionType.expense;
+  String _selectedCategory = '';
+  final DateTime _selectedDate = DateTime.now();
+
   @override
   void initState() {
     super.initState();
-    // Initialize with greeting message
-    _chatMessages = [
-      ChatMessage(
-        type: ChatMessageType.assistant,
-        text: "Hello! 👋 Let's start adding your transaction here!",
-      ),
-    ];
-    _loadRecentTransactions();
-    _scrollToBottom();
-  }
+    _descriptionController = TextEditingController();
+    _amountController = TextEditingController();
+    _aiMessageController = TextEditingController();
+    _scrollController = ScrollController();
 
-  Future<void> _loadRecentTransactions() async {
-    try {
-      final provider = context.read<TransactionProvider>();
-      final now = DateTime.now();
-      final yesterday = now.subtract(const Duration(hours: 48));
-
-      // Get transactions from the last 48 hours
-      final recentTransactions = provider.transactions
-          .where((t) => t.date.isAfter(yesterday) && t.date.isBefore(now))
-          .toList()
-        ..sort((a, b) => b.date.compareTo(a.date)); // Sort by date descending
-
-      if (recentTransactions.isNotEmpty) {
-        // Add a separator message
-        _addChatMessage(
-          'Conversation last 48 hours',
-          ChatMessageType.assistant,
-        );
-
-        // Add recent transactions to the completed transactions list
-        setState(() {
-          for (final transaction in recentTransactions.reversed) {
-            final formattedAmt = formatCurrency(transaction.amount);
-            _completedTransactions.add(
-              TransactionRecord(
-                description: transaction.description,
-                amount: transaction.amount,
-                category: transaction.category,
-                date: transaction.date,
-                type: transaction.type,
-                userMessage: transaction.userMessage ??
-                    transaction
-                        .description, // Use original user message if available
-              ),
-            );
-          }
-        });
-      }
-    } catch (e) {
-      print('Error loading recent transactions: $e');
-    }
+    _selectedCategory = expenseCategories[0];
   }
 
   @override
@@ -191,75 +114,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _scrollToBottom();
   }
 
-  Future<void> _handleAddTransaction() async {
-    final description = _descriptionController.text.trim();
-    final amountStr = _amountController.text.trim();
-
-    if (description.isEmpty || amountStr.isEmpty) {
-      _addChatMessage('Please fill in all fields', ChatMessageType.assistant);
-      return;
-    }
-
-    // Remove commas from the amount string before parsing
-    final cleanAmountStr = amountStr.replaceAll(',', '');
-    final amount = double.tryParse(cleanAmountStr);
-    if (amount == null || amount <= 0) {
-      _addChatMessage('Please enter a valid amount', ChatMessageType.assistant);
-      return;
-    }
-
-    // Ensure user is signed in
-    final uid = FirebaseService().currentUser?.uid;
-    if (uid == null) {
-      _addChatMessage(
-        'You must be signed in to add a transaction',
-        ChatMessageType.assistant,
-      );
-      return;
-    }
-
-    final transaction = Transaction(
-      id: '',
-      userId: uid,
-      description: description,
-      amount: amount,
-      type: _selectedType,
-      category: _selectedCategory,
-      date: _selectedDate,
-      createdAt: DateTime.now(),
-      userMessage:
-          description, // For manual entry, use description as user message
-    );
-
-    final provider = context.read<TransactionProvider>();
-    await provider.addTransaction(transaction);
-
-    if (provider.error != null) {
-      _addChatMessage(
-        'Failed to add transaction: ${provider.error}',
-        ChatMessageType.assistant,
-      );
-      return;
-    }
-
-    if (!mounted) return;
-
-    // Show success message with transaction details
-    final emoji = _selectedType == TransactionType.expense ? '🛒' : '💰';
-    final action =
-        _selectedType == TransactionType.expense ? 'spent' : 'earned';
-    final formattedAmount = formatCurrency(amount);
-
-    _addChatMessage(
-      '$emoji Got it! You\'ve $action $formattedAmount on $description. Great job keeping track! 😊',
-      ChatMessageType.assistant,
-    );
-
-    // Clear form fields
-    _descriptionController.clear();
-    _amountController.clear();
-    _aiMessageController.clear();
-  }
+  // _handleAddTransaction was unused and has been removed.
 
   Future<void> _parseAIMessage() async {
     // Prevent duplicate submissions
@@ -301,7 +156,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         if (description.isNotEmpty && amount.isNotEmpty) {
           // Parse amount for database storage
           final cleanAmount = amount.replaceAll(',', '');
-          final parsedAmount = double.tryParse(cleanAmount) ?? 0;
+          var parsedAmount = double.tryParse(cleanAmount) ?? 0;
+
+          // Apply thousand multiplier if enabled
+          if (_addThousands) {
+            parsedAmount = parsedAmount * 1000;
+          }
 
           // Ensure user is signed in
           final uid = FirebaseService().currentUser?.uid;
@@ -855,6 +715,49 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         ),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Add 000 Toggle with Preview
+                Row(
+                  children: [
+                    Checkbox(
+                      tristate: false,
+                      value: _addThousands,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          _addThousands = value ?? true;
+                        });
+                      },
+                    ),
+                    const Text(
+                      'Add 000',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const Spacer(),
+                    // Preview
+                    if (_amountController.text.isNotEmpty)
+                      Text(
+                        () {
+                          String amountStr = _amountController.text.trim();
+                          if (amountStr.isEmpty) return '0 VND';
+
+                          // Remove commas to get pure digits
+                          amountStr = amountStr.replaceAll(',', '');
+                          final amount = double.tryParse(amountStr) ?? 0;
+
+                          // Apply thousand multiplier only if enabled
+                          final finalAmount =
+                              _addThousands ? amount * 1000 : amount;
+                          final formatter = NumberFormat('#,##0', 'en_US');
+                          return '${formatter.format(finalAmount)} VND';
+                        }(),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 12),

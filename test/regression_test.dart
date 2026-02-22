@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mamoney/screens/add_transaction_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:mamoney/utils/input_formatters.dart';
 import 'package:mamoney/services/ai_service.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/utils/currency_utils.dart';

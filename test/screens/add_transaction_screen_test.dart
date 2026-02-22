@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mamoney/screens/add_transaction_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:mamoney/utils/input_formatters.dart';
 
 void main() {
   group('ThousandsSeparatorInputFormatter', () {

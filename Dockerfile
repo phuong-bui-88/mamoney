@@ -5,24 +5,17 @@ FROM ubuntu:22.04
 # Non-interactive mode
 ENV DEBIAN_FRONTEND=noninteractive
 
-
-
-RUN apt-get update && apt-get install -y \
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
     git curl wget unzip xz-utils zip ca-certificates \
     openjdk-17-jdk clang cmake ninja-build pkg-config \
     libgtk-3-dev liblzma-dev libglu1-mesa libxi6 libgconf-2-4 \
     libxss1 libxtst6 libxrandr2 libasound2 libpangocairo-1.0-0 \
     libatk1.0-0 libcairo-gobject2 libgtk-3-0 libgdk-pixbuf2.0-0 \
-    zsh bash netcat-openbsd socat sed coreutils unzip \
-    libc6 libc6-dev locales gnupg \
-    vim \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/* 
-
-
-
+    zsh netcat-openbsd socat sed coreutils \
+    libc6 libc6-dev locales
 
 ENV FLUTTER_HOME=/usr/local/flutter
 # Install Flutter (stable)
@@ -43,8 +36,7 @@ RUN useradd -m -u 1000 flutteruser && \
 
 # Install Oh-My-Zsh for flutteruser with proper PATH setup to prevent utility lookup errors
 # 1. Ensure essential tools are available and set the PATH globally for the build process
-ENV PATH="/usr/local/flutter/bin:/opt/android-sdk/platform-tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-
+ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 
 # 2. Install Oh-My-Zsh as flutteruser correctly
@@ -52,7 +44,7 @@ USER flutteruser
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended && \
     sed -i 's/^ZSH_THEME=.*/ZSH_THEME="robbyrussell"/' /home/flutteruser/.zshrc && \
     sed -i 's/^plugins=.*/plugins=(git docker)/' /home/flutteruser/.zshrc && \
-    echo 'export PATH="/usr/local/flutter/bin:/opt/android-sdk/platform-tools:$PATH"' >> /home/flutteruser/.zshrc
+    echo 'export PATH="/usr/local/flutter/bin:$PATH"' >> /home/flutteruser/.zshrc
 
 # Set working directory
 WORKDIR /workspace

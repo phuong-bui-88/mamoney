@@ -27,7 +27,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      print('Email or password is empty');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
@@ -37,14 +36,11 @@ class _LoginScreenState extends State<LoginScreen> {
     // Basic email validation
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
     if (!emailRegex.hasMatch(email)) {
-      print('Email validation failed for email: $email');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid email address')),
       );
       return;
     }
-
-    print('Email validation passed');
 
     // Password validation
     if (password.length < 2) {
@@ -147,6 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           gradient: LinearGradient(
                             colors: [
                               Theme.of(context).primaryColor,
+                              // ignore: deprecated_member_use
                               Theme.of(context).primaryColor.withOpacity(0.8),
                             ],
                             begin: Alignment.topLeft,
@@ -157,6 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             BoxShadow(
                               color: Theme.of(context)
                                   .primaryColor
+                                  // ignore: deprecated_member_use
                                   .withOpacity(0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 4),

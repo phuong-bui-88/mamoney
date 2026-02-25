@@ -19,9 +19,6 @@ void main() {
       test('should extract description and amount from standard format', () {
         const response = 'DESCRIPTION: Bought lunch | AMOUNT: 50';
 
-        final result =
-            AIService.parseTransactionMessage('test').then((value) => value);
-
         // Test the extraction logic by simulating the response
         final extracted = _simulateExtraction(response);
 

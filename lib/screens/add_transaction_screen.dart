@@ -82,6 +82,36 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _scrollController = ScrollController();
     _selectedType = TransactionType.expense;
     _selectedCategory = expenseCategories[0];
+    _loadOldTransactions();
+  }
+
+  /// Load transactions from the last 48 hours from Firebase
+  void _loadOldTransactions() {
+    final provider = context.read<TransactionProvider>();
+    final now = DateTime.now();
+    final fortyEightHoursAgo = now.subtract(const Duration(hours: 48));
+
+    // Filter transactions from the last 48 hours
+    final oldTransactions = provider.transactions
+        .where((tx) => tx.createdAt.isAfter(fortyEightHoursAgo))
+        .toList();
+
+    // Sort by createdAt ascending (oldest first)
+    oldTransactions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    setState(() {
+      _completedTransactions.clear();
+      for (final tx in oldTransactions) {
+        _completedTransactions.add(TransactionRecord(
+          description: tx.description,
+          amount: tx.amount,
+          category: tx.category,
+          date: tx.date,
+          type: tx.type,
+          userMessage: tx.userMessage ?? tx.description,
+        ));
+      }
+    });
   }
 
   @override
@@ -223,24 +253,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             return;
           }
 
-          // Save completed transaction with the user message
-          setState(() {
-            _completedTransactions.add(
-              TransactionRecord(
-                description: description,
-                amount: parsedAmount,
-                category: validCategory,
-                date: _selectedDate,
-                type: _selectedType,
-                userMessage: userInputMessage,
-              ),
-            );
-          });
-
-          // Clear controllers for next transaction
+          // Clear controllers for next transaction immediately for UX
           _descriptionController.clear();
           _amountController.clear();
-          _scrollToBottom();
+
+          // Refresh transactions from Firebase after a brief delay to ensure the transaction is synced
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (mounted) {
+            _loadOldTransactions();
+            _scrollToBottom();
+          }
         } else {
           if (description.isNotEmpty) {
             _descriptionController.text = description;

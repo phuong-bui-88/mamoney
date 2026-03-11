@@ -722,19 +722,111 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const SizedBox(height: 12),
-                // Set custom rules
-                TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    'Set custom rules',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 13,
-                      decoration: TextDecoration.underline,
+                const SizedBox(height: 16),
+                // Transaction Type Selector
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedType = TransactionType.income;
+                            _selectedCategory = incomeCategories.first;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _selectedType == TransactionType.income
+                                ? Colors.green
+                                : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                            border: _selectedType == TransactionType.income
+                                ? Border.all(
+                                    color: Colors.green.shade700, width: 2)
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.arrow_downward,
+                                color: _selectedType == TransactionType.income
+                                    ? Colors.white
+                                    : Colors.grey,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Income',
+                                style: TextStyle(
+                                  color: _selectedType == TransactionType.income
+                                      ? Colors.white
+                                      : Colors.grey,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedType = TransactionType.expense;
+                            _selectedCategory = expenseCategories.first;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _selectedType == TransactionType.expense
+                                ? Colors.red
+                                : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(12),
+                            border: _selectedType == TransactionType.expense
+                                ? Border.all(
+                                    color: Colors.red.shade700, width: 2)
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.arrow_upward,
+                                color: _selectedType == TransactionType.expense
+                                    ? Colors.white
+                                    : Colors.grey,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Expense',
+                                style: TextStyle(
+                                  color:
+                                      _selectedType == TransactionType.expense
+                                          ? Colors.white
+                                          : Colors.grey,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

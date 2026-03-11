@@ -286,35 +286,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                 ),
               const SizedBox(height: 16),
 
-              // Transaction Type
-              SegmentedButton<TransactionType>(
-                segments: const <ButtonSegment<TransactionType>>[
-                  ButtonSegment<TransactionType>(
-                    value: TransactionType.income,
-                    label: Text('Income'),
-                    icon: Icon(Icons.arrow_downward),
-                  ),
-                  ButtonSegment<TransactionType>(
-                    value: TransactionType.expense,
-                    label: Text('Expense'),
-                    icon: Icon(Icons.arrow_upward),
-                  ),
-                ],
-                selected: <TransactionType>{_selectedType},
-                onSelectionChanged: (Set<TransactionType> newSelection) {
-                  setState(() {
-                    _selectedType = newSelection.first;
-                    // Reset category to first one of the new type
-                    _selectedCategory =
-                        (newSelection.first == TransactionType.expense
-                                ? expenseCategories
-                                : incomeCategories)
-                            .first;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-
               // Category
               DropdownButtonFormField<String>(
                 initialValue: _selectedCategory,
@@ -341,16 +312,29 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
               const SizedBox(height: 16),
 
               // Date
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Date'),
-                subtitle:
-                    Text(DateFormat('MMM dd, yyyy').format(_selectedDate)),
-                trailing: const Icon(Icons.calendar_today),
+              GestureDetector(
                 onTap: () => _selectDate(context),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: const BorderSide(color: Colors.grey),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Date',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      suffixIcon: const Icon(Icons.calendar_today),
+                    ),
+                    child: Text(
+                      DateFormat('MMM dd, yyyy').format(_selectedDate),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

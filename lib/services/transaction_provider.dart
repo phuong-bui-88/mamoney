@@ -139,6 +139,35 @@ class TransactionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Get category breakdown for a list of transactions
+  // Returns a map of category names to total amounts
+  Map<String, double> getCategoryBreakdown(List<Transaction> transactions) {
+    final breakdown = <String, double>{};
+    
+    for (var transaction in transactions) {
+      breakdown[transaction.category] = 
+          (breakdown[transaction.category] ?? 0) + transaction.amount;
+    }
+    
+    return breakdown;
+  }
+
+  // Get income category breakdown for filtered transactions
+  Map<String, double> getIncomeCategoryBreakdown() {
+    final incomeTransactions = filteredTransactions
+        .where((t) => t.type == TransactionType.income)
+        .toList();
+    return getCategoryBreakdown(incomeTransactions);
+  }
+
+  // Get expense category breakdown for filtered transactions
+  Map<String, double> getExpenseCategoryBreakdown() {
+    final expenseTransactions = filteredTransactions
+        .where((t) => t.type == TransactionType.expense)
+        .toList();
+    return getCategoryBreakdown(expenseTransactions);
+  }
+
   @override
   void dispose() {
     _transactionSubscription?.cancel();

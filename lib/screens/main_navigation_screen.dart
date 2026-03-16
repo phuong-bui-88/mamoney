@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:mamoney/screens/home_screen.dart';
 import 'package:mamoney/screens/transaction_list_screen.dart';
-import 'package:mamoney/screens/settings_screen.dart';
+import 'package:mamoney/screens/ask_screen.dart';
+import 'package:mamoney/services/auth_provider.dart';
+import 'package:mamoney/services/chat_provider.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -16,8 +19,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final List<Widget> _screens = const [
     HomeScreen(),
     TransactionListScreen(),
-    SettingsScreen(),
+    AskScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize ChatProvider with current user ID
+    _initializeChatProvider();
+  }
+
+  /// Initialize ChatProvider with user ID for Firestore storage
+  Future<void> _initializeChatProvider() async {
+    final authProvider = context.read<AuthProvider>();
+    final chatProvider = context.read<ChatProvider>();
+    final userId = authProvider.user?.uid;
+
+    await chatProvider.init(userId);
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -42,8 +61,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             label: 'Transactions',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
+            icon: Icon(Icons.chat),
+            label: 'Ask',
           ),
         ],
       ),

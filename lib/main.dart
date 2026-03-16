@@ -5,6 +5,7 @@ import 'package:mamoney/firebase_options.dart';
 import 'package:mamoney/services/firebase_service.dart';
 import 'package:mamoney/services/auth_provider.dart';
 import 'package:mamoney/services/transaction_provider.dart';
+import 'package:mamoney/services/chat_provider.dart';
 import 'package:mamoney/screens/login_screen.dart';
 // ...existing code...
 import 'package:logging/logging.dart';
@@ -47,6 +48,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<TransactionProvider>(
           create: (_) => TransactionProvider(),
+        ),
+        ChangeNotifierProvider<ChatProvider>(
+          create: (_) => ChatProvider(),
         ),
       ],
       child: MaterialApp(

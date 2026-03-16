@@ -27,7 +27,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('MaMoney'),
+        title: Consumer<AuthProvider>(
+          builder: (context, authProvider, _) {
+            final email = authProvider.user?.email ?? 'User';
+            return Text(
+              'MaMoney - $email',
+              overflow: TextOverflow.ellipsis,
+            );
+          },
+        ),
         centerTitle: true,
         actions: [
           IconButton(

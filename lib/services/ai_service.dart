@@ -181,4 +181,101 @@ class AIService {
     final match = regex.firstMatch(str);
     return match?.group(0) ?? '';
   }
+
+  /// Ask a financial question with RAG (Retrieval-Augmented Generation)
+  /// Provides AI with transaction context and financial knowledge base
+  /// Returns the AI's response as a string
+  static Future<String> askFinancialQuestion(
+    String question,
+    String transactionContext,
+    String financialContext,
+  ) async {
+    try {
+      // Validate that GitHub token is configured
+      if (AIConfig.githubToken.isEmpty) {
+        return 'Error: GitHub token not configured. Please set GITHUB_TOKEN environment variable.';
+      }
+
+      final systemPrompt = '''You are a helpful financial advisor AI assistant. 
+You have access to the user's transaction history and financial knowledge base.
+
+## User's Transaction Context:
+$transactionContext
+
+## Financial Knowledge Base:
+$financialContext
+
+Based on the user's transaction history and financial principles, provide helpful, actionable financial advice.
+Be specific and reference their actual spending patterns when relevant.
+Keep responses concise but informative (2-3 paragraphs max).
+Always provide practical, immediately applicable advice.''';
+
+      final response = await _callGitHubModelsChat(systemPrompt, question);
+
+      if (response['success']) {
+        return response['message'];
+      } else {
+        return 'Error: ${response['error']}';
+      }
+    } catch (e) {
+      return 'Error asking financial question: $e';
+    }
+  }
+
+  /// Call GitHub Models API for general chat (not transaction parsing)
+  static Future<Map<String, dynamic>> _callGitHubModelsChat(
+    String systemPrompt,
+    String userMessage,
+  ) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${AIConfig.githubToken}',
+      };
+
+      final body = jsonEncode({
+        'messages': [
+          {
+            'role': 'system',
+            'content': systemPrompt,
+          },
+          {
+            'role': 'user',
+            'content': userMessage,
+          }
+        ],
+        'temperature': 0.7,
+        'max_tokens': 500,
+        'model': AIConfig.model,
+      });
+
+      final response = await http
+          .post(
+            Uri.parse(AIConfig.getApiUrl()),
+            headers: headers,
+            body: body,
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final message =
+            data['choices'][0]['message']['content'].toString().trim();
+        return {'success': true, 'message': message};
+      } else if (response.statusCode == 401) {
+        return {
+          'success': false,
+          'error':
+              'Authentication Error: Invalid or expired GitHub token. Please rebuild with a valid GITHUB_TOKEN via --dart-define.',
+        };
+      } else {
+        return {
+          'success': false,
+          'error': 'API Error: ${response.statusCode} - ${response.body}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
 }

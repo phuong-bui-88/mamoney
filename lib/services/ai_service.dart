@@ -185,6 +185,7 @@ class AIService {
   /// Ask a financial question with RAG (Retrieval-Augmented Generation)
   /// Provides AI with transaction context and financial knowledge base
   /// Returns the AI's response as a string
+  /// For budget summaries, formats response as: "Based on your X monthly budget items: 1. Item (emoji): amount VND ... Total: amount VND"
   static Future<String> askFinancialQuestion(
     String question,
     String transactionContext,
@@ -205,10 +206,15 @@ $transactionContext
 ## Financial Knowledge Base:
 $financialContext
 
-Based on the user's transaction history and financial principles, provide helpful, actionable financial advice.
-Be specific and reference their actual spending patterns when relevant.
-Keep responses concise but informative (2-3 paragraphs max).
-Always provide practical, immediately applicable advice.''';
+FOR BUDGET SUMMARIES: Format responses as:
+"Based on your X monthly budget items:
+1. Category (emoji): amount VND (dd-mm-yyyy)
+2. Category (emoji): amount VND (dd-mm-yyyy)
+3. Category (emoji): amount VND (dd-mm-yyyy)
+======================================
+Total: total_amount VND"
+
+Use appropriate emojis: 🏠 Housing, 🍔 Food, 🚗 Transportation, 💡 Utilities, 🏥 Healthcare''';
 
       final response = await _callGitHubModelsChat(systemPrompt, question);
 

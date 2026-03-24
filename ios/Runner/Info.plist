@@ -55,5 +55,9 @@
 	<array>
 		<string>_services._udp</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to your camera to capture and parse invoices using the camera.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to select invoices for parsing.</string>
 </dict>
 </plist>

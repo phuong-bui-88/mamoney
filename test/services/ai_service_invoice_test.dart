@@ -1,33 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mamoney/services/ai_service.dart';
 import 'dart:io';
-import 'dart:typed_data';
 
 void main() {
   group('AIService Invoice Parsing Tests', () {
-    /// Helper to create a minimal valid image file for testing
-    File createTestImageFile() {
-      const minimalJpeg = [
-        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
-        0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
-        0x00, 0x03, 0x02, 0x02, 0x02, 0x02, 0x02, 0x03, 0x02, 0x02, 0x02, 0x03,
-        0x03, 0x03, 0x03, 0x04, 0x06, 0x04, 0x04, 0x04, 0x04, 0x04, 0x08, 0x06,
-        0x06, 0x05, 0x06, 0x09, 0x08, 0x0A, 0x0A, 0x09, 0x08, 0x09, 0x09, 0x0A,
-        0x0C, 0x0F, 0x0C, 0x0A, 0x0B, 0x0E, 0x0B, 0x09, 0x09, 0x0D, 0x11, 0x0D,
-        0x0E, 0x0F, 0x10, 0x10, 0x11, 0x10, 0x0A, 0x0C, 0x12, 0x13, 0x0F, 0x13,
-        0x10, 0x10, 0x10, 0xFF, 0xC9, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01,
-        0x01, 0x01, 0x11, 0x00, 0xFF, 0xCC, 0x00, 0x06, 0x00, 0x10, 0x10, 0x05,
-        0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x37, 0xFE,
-        0xFF, 0xD9
-      ];
-
-      final tempDir = Directory.systemTemp;
-      final testFile =
-          File('${tempDir.path}/test_invoice_${DateTime.now().millisecondsSinceEpoch}.jpg');
-      testFile.writeAsBytesSync(Uint8List.fromList(minimalJpeg));
-      return testFile;
-    }
-
     group('_getMediaType', () {
       test('returns correct media type for JPEG', () {
         // Since _getMediaType is static and private, we test behavior indirectly
@@ -44,14 +20,14 @@ void main() {
       test('defaults to image/jpeg for unknown extension', () {
         // Unknown extensions should default to JPEG for safety
         const extension = 'unknown';
-        expect(!['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension), true);
+        expect(
+            !['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension), true);
       });
     });
 
     group('parseInvoiceImage', () {
       test('returns error when GitHub token not configured', () async {
-        final result =
-            await AIService.parseInvoiceImage(null);
+        final result = await AIService.parseInvoiceImage(null);
 
         // GitHub token is not configured in test environment, so this is expected
         expect(result.isNotEmpty, true);
@@ -194,8 +170,7 @@ void main() {
 
       test('validates extracted category against income list', () {
         const extractedCategory = 'Salary';
-        final isValid =
-            incomeCategories.contains(extractedCategory.trim());
+        final isValid = incomeCategories.contains(extractedCategory.trim());
 
         expect(isValid, true);
       });

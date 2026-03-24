@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/screens/add_transaction_screen.dart';
 import 'package:mamoney/services/transaction_provider.dart';
-import 'package:mamoney/services/firebase_service.dart';
 
 void main() {
   group('AddTransactionScreen - Camera Button Widget Tests', () {

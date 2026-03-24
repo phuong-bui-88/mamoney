@@ -6,6 +6,7 @@ import 'package:mamoney/services/firebase_service.dart';
 import 'package:mamoney/services/ai_service.dart';
 import 'package:intl/intl.dart';
 import 'package:mamoney/utils/currency_utils.dart';
+import 'package:image_picker/image_picker.dart';
 
 enum ChatMessageType { user, assistant }
 
@@ -68,10 +69,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final List<TransactionRecord> _completedTransactions = [];
   bool _isParsingAI = false;
   bool _isSavingTransaction = false;
+  bool _isProcessingImage = false;
 
   late TransactionType _selectedType;
   String _selectedCategory = '';
   final DateTime _selectedDate = DateTime.now();
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -143,6 +146,203 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   // _handleAddTransaction was unused and has been removed.
+
+  /// Capture invoice image from camera and parse it
+  Future<void> _captureAndParseInvoice() async {
+    if (_isProcessingImage || _isSavingTransaction) {
+      return;
+    }
+
+    try {
+      final XFile? imageFile = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+
+      if (imageFile == null) {
+        return; // User cancelled
+      }
+
+      setState(() {
+        _isProcessingImage = true;
+      });
+
+      _addChatMessage('📸 Processing invoice...', ChatMessageType.assistant);
+
+      // Read image bytes - works on both web and mobile
+      final imageBytes = await imageFile.readAsBytes();
+      final mediaType = imageFile.mimeType ?? 'image/jpeg';
+
+      final items = await AIService.parseInvoiceImage(
+        null,
+        imageBytes: imageBytes,
+        mediaType: mediaType,
+      );
+
+      if (!mounted) return;
+
+      // Check for errors
+      if (items.isNotEmpty && items.first.containsKey('error')) {
+        _addChatMessage(
+          'Error parsing invoice: ${items.first['error']}',
+          ChatMessageType.assistant,
+        );
+        setState(() {
+          _isProcessingImage = false;
+        });
+        return;
+      }
+
+      // Process each extracted item
+      if (items.isEmpty) {
+        _addChatMessage(
+          'Could not extract items from invoice. Please try another image.',
+          ChatMessageType.assistant,
+        );
+        setState(() {
+          _isProcessingImage = false;
+        });
+        return;
+      }
+
+      _addChatMessage(
+        '✅ Found ${items.length} items in invoice. Creating transactions for all items...',
+        ChatMessageType.assistant,
+      );
+
+      // Ensure user is signed in
+      final uid = FirebaseService().currentUser?.uid;
+      if (uid == null) {
+        _addChatMessage(
+          'You must be signed in to add a transaction',
+          ChatMessageType.assistant,
+        );
+        setState(() {
+          _isProcessingImage = false;
+        });
+        return;
+      }
+
+      // Process and save all items
+      int successCount = 0;
+      double totalAmount = 0;
+      final provider = context.read<TransactionProvider>();
+
+      for (final item in items) {
+        final description = item['description'] ?? '';
+        final amount = item['amount'] ?? '';
+        final category = item['category'] ?? 'Other';
+        final type = item['type'] ?? 'expense';
+
+        // Debug: log extracted data
+        print(
+            'DEBUG: Processing item - Description: "$description", Amount: "$amount", Category: "$category"');
+
+        if (description.isEmpty || amount.isEmpty) {
+          print('DEBUG: Skipping item with empty description or amount');
+          continue;
+        }
+
+        // Determine transaction type
+        TransactionType selectedType = TransactionType.expense;
+        if (type.toLowerCase() == 'income') {
+          selectedType = TransactionType.income;
+        }
+
+        // Parse amount for database storage
+        final cleanAmount = amount.trim().replaceAll(RegExp(r'[^\d.]'), '');
+        var parsedAmount = double.tryParse(cleanAmount) ?? 0;
+
+        print(
+            'DEBUG: Amount parsing - Original: "$amount" → Cleaned: "$cleanAmount" → Parsed: $parsedAmount');
+
+        // Validate amount is reasonable (not 0 or too small)
+        if (parsedAmount <= 0) {
+          print('DEBUG: Skipping item with invalid amount: $parsedAmount');
+          continue;
+        }
+
+        // Validate and map category
+        final categories = selectedType == TransactionType.income
+            ? incomeCategories
+            : expenseCategories;
+
+        String validCategory = category;
+
+        // Try exact match first
+        if (!categories.contains(category)) {
+          // Try to find partial match (e.g., "Food" matches "🍚 Food")
+          final partialMatch = categories.firstWhere(
+            (cat) => cat.toLowerCase().contains(category.toLowerCase()),
+            orElse: () => categories.first,
+          );
+          validCategory = partialMatch;
+        }
+
+        // Create transaction object for database
+        final transaction = Transaction(
+          id: '',
+          userId: uid,
+          description: description,
+          amount: parsedAmount,
+          type: selectedType,
+          category: validCategory,
+          date: _selectedDate,
+          createdAt: DateTime.now(),
+          userMessage: 'Invoice: $description',
+        );
+
+        // Save to database
+        await provider.addTransaction(transaction);
+
+        if (provider.error != null) {
+          _addChatMessage(
+            '❌ Failed to save: $description - ${provider.error}',
+            ChatMessageType.assistant,
+          );
+        } else {
+          successCount++;
+          totalAmount += parsedAmount;
+        }
+      }
+
+      if (successCount == 0) {
+        _addChatMessage(
+          '⚠️ Could not save any items from the invoice. Please try again.',
+          ChatMessageType.assistant,
+        );
+        setState(() {
+          _isProcessingImage = false;
+        });
+        return;
+      }
+
+      _addChatMessage(
+        '✅ Invoice saved: $successCount items - Total ${formatCurrency(totalAmount)}',
+        ChatMessageType.assistant,
+      );
+
+      // Refresh transactions from Firebase
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        _loadOldTransactions();
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) {
+        _addChatMessage(
+          'Error: $e',
+          ChatMessageType.assistant,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingImage = false;
+        });
+      }
+    }
+  }
 
   Future<void> _parseAIMessage() async {
     // Prevent duplicate submissions
@@ -701,6 +901,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // Camera button for invoice
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.blue,
+                      ),
+                      child: IconButton(
+                        onPressed: _isProcessingImage || _isSavingTransaction
+                            ? null
+                            : () {
+                                _captureAndParseInvoice();
+                              },
+                        icon: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Send button for text input
                     Container(
                       width: 48,
                       height: 48,

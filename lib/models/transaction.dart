@@ -14,6 +14,7 @@ class Transaction {
   final DateTime date;
   final DateTime createdAt;
   final String? userMessage; // Original user input message
+  final String? imageUrl; // Invoice/receipt image URL
 
   Transaction({
     required this.id,
@@ -25,6 +26,7 @@ class Transaction {
     required this.date,
     required this.createdAt,
     this.userMessage,
+    this.imageUrl,
   });
 
   // Convert Transaction to JSON
@@ -39,6 +41,7 @@ class Transaction {
       'date': Timestamp.fromDate(date),
       'createdAt': Timestamp.fromDate(createdAt),
       'userMessage': userMessage,
+      'imageUrl': imageUrl,
     };
   }
 
@@ -56,6 +59,7 @@ class Transaction {
       date: (map['date'] as Timestamp).toDate(),
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       userMessage: map['userMessage'],
+      imageUrl: map['imageUrl'],
     );
   }
 
@@ -70,6 +74,7 @@ class Transaction {
     DateTime? date,
     DateTime? createdAt,
     String? userMessage,
+    String? imageUrl,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -81,6 +86,7 @@ class Transaction {
       date: date ?? this.date,
       createdAt: createdAt ?? this.createdAt,
       userMessage: userMessage ?? this.userMessage,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 

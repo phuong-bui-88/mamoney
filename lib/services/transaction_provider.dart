@@ -67,8 +67,8 @@ class TransactionProvider extends ChangeNotifier {
     _transactionSubscription = transactionStream.listen((transactions) {
       print(
           '[DEBUG] TransactionProvider received ${transactions.length} transactions');
-      // Sort transactions by createdAt in descending order
-      transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // Sort transactions by createdAt in ascending order (oldest to newest)
+      transactions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       _transactions = transactions;
       notifyListeners();
     });

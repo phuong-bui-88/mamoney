@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/models/transaction.dart';
@@ -24,6 +25,7 @@ class TransactionRecord {
   final DateTime date;
   final TransactionType type;
   final String userMessage;
+  final String? imageUrl; // Add image URL field
 
   TransactionRecord({
     required this.description,
@@ -32,6 +34,7 @@ class TransactionRecord {
     required this.date,
     required this.type,
     required this.userMessage,
+    this.imageUrl,
   });
 }
 
@@ -70,6 +73,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   bool _isParsingAI = false;
   bool _isSavingTransaction = false;
   bool _isProcessingImage = false;
+  bool _isUploadingImage = false;
+  XFile? _selectedInvoiceImage; // Store the invoice image for upload
 
   late TransactionType _selectedType;
   String _selectedCategory = '';
@@ -99,7 +104,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         .where((tx) => tx.createdAt.isAfter(fortyEightHoursAgo))
         .toList();
 
-    // Sort by createdAt ascending (oldest first)
+    // Sort by createdAt ASCENDING (oldest first)
     oldTransactions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
     setState(() {
@@ -112,6 +117,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           date: tx.date,
           type: tx.type,
           userMessage: tx.userMessage ?? tx.description,
+          imageUrl: tx.imageUrl,
         ));
       }
     });
@@ -181,7 +187,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             shape: BoxShape.circle,
                             color: Colors.blue.shade100,
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.camera_alt,
                             color: Colors.blue,
                             size: 28,
@@ -207,7 +213,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             shape: BoxShape.circle,
                             color: Colors.green.shade100,
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.photo_library,
                             color: Colors.green,
                             size: 28,
@@ -242,6 +248,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (imageFile == null) {
         return; // User cancelled
       }
+
+      // Store the image file for later upload
+      _selectedInvoiceImage = imageFile;
 
       setState(() {
         _isProcessingImage = true;
@@ -303,6 +312,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         return;
       }
 
+      // Upload invoice image to Firebase and get URL
+      String? invoiceImageUrl;
+      if (_selectedInvoiceImage != null) {
+        print('DEBUG: Starting image upload...');
+        invoiceImageUrl = await _uploadInvoiceImage(_selectedInvoiceImage!);
+        print('DEBUG: Image upload completed. URL: $invoiceImageUrl');
+      } else {
+        print('DEBUG: No image selected for upload');
+      }
+
       // Process and save all items
       int successCount = 0;
       double totalAmount = 0;
@@ -316,7 +335,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
         // Debug: log extracted data
         print(
-            'DEBUG: Processing item - Description: "$description", Amount: "$amount", Category: "$category"');
+            'DEBUG: Processing item - Description: "$description", Amount: "$amount", Category: "$category", ImageURL: $invoiceImageUrl');
 
         if (description.isEmpty || amount.isEmpty) {
           print('DEBUG: Skipping item with empty description or amount');
@@ -359,7 +378,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           validCategory = partialMatch;
         }
 
-        // Create transaction object for database
+        // Create transaction object for database with invoice image URL
         final transaction = Transaction(
           id: '',
           userId: uid,
@@ -370,6 +389,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           date: _selectedDate,
           createdAt: DateTime.now(),
           userMessage: 'Invoice: $description',
+          imageUrl: invoiceImageUrl,
         );
 
         // Save to database
@@ -419,6 +439,75 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (mounted) {
         setState(() {
           _isProcessingImage = false;
+        });
+      }
+    }
+  }
+
+  /// Upload invoice image to Firebase Storage
+  Future<String?> _uploadInvoiceImage(XFile imageFile) async {
+    try {
+      if (_isUploadingImage) {
+        print('DEBUG _uploadInvoiceImage: Already uploading, returning null');
+        return null;
+      }
+
+      setState(() {
+        _isUploadingImage = true;
+      });
+
+      final firebaseService = FirebaseService();
+      final uid = firebaseService.currentUser?.uid;
+      if (uid == null) {
+        print('ERROR _uploadInvoiceImage: User not authenticated');
+        _addChatMessage(
+          'You must be signed in to upload an invoice image',
+          ChatMessageType.assistant,
+        );
+        return null;
+      }
+
+      print('DEBUG _uploadInvoiceImage: User UID: $uid');
+      _addChatMessage(
+        '⬆️ Uploading invoice image...',
+        ChatMessageType.assistant,
+      );
+
+      // Read image bytes - works on both web and mobile
+      final imageBytes = await imageFile.readAsBytes();
+      print('DEBUG _uploadInvoiceImage: Image bytes read: ${imageBytes.length} bytes');
+      
+      // Use current timestamp as transaction ID for now (will be replaced with actual ID if needed)
+      final transactionId = '${DateTime.now().millisecondsSinceEpoch}';
+      print('DEBUG _uploadInvoiceImage: Calling uploadTransactionImage with transactionId: $transactionId');
+      
+      final imageUrl = await firebaseService.uploadTransactionImage(
+        null,
+        uid,
+        transactionId,
+        imageBytes: imageBytes,
+      );
+
+      print('DEBUG _uploadInvoiceImage: Upload successful. URL: $imageUrl');
+      _addChatMessage(
+        '✅ Invoice image uploaded successfully',
+        ChatMessageType.assistant,
+      );
+
+      return imageUrl;
+    } catch (e) {
+      print('ERROR _uploadInvoiceImage: Exception - $e');
+      if (mounted) {
+        _addChatMessage(
+          'Warning: Failed to upload image - $e',
+          ChatMessageType.assistant,
+        );
+      }
+      return null;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
         });
       }
     }
@@ -707,7 +796,176 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 ),
               ],
             ),
+            // Invoice Image Thumbnail (if exists)
+            if (record.imageUrl != null && record.imageUrl!.isNotEmpty)
+              _buildInvoiceImageWidget(record.imageUrl!),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceImageWidget(String imageUrl) {
+    // Handle both local and network images
+    if (imageUrl.startsWith('local://')) {
+      // Local image - fetch from SharedPreferences
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: GestureDetector(
+          onTap: () => _showImagePreview(imageUrl),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: FutureBuilder<Uint8List?>(
+              future: FirebaseService().getLocalImage(imageUrl),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Container(
+                    height: 120,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  );
+                }
+                
+                if (snapshot.hasError || snapshot.data == null) {
+                  return Container(
+                    height: 120,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: Icon(Icons.image_not_supported, color: Colors.grey),
+                    ),
+                  );
+                }
+                
+                return Stack(
+                  children: [
+                    Image.memory(
+                      snapshot.data!,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.zoom_in,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Network image - use Image.network
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: GestureDetector(
+          onTap: () => _showImagePreview(imageUrl),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Stack(
+              children: [
+                Image.network(
+                  imageUrl,
+                  height: 120,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 120,
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported, color: Colors.grey),
+                      ),
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 120,
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.zoom_in,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showImagePreview(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            color: Colors.black.withOpacity(0.9),
+            child: Center(
+              child: imageUrl.startsWith('local://')
+                  ? FutureBuilder<Uint8List?>(
+                      future: FirebaseService().getLocalImage(imageUrl),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          return InteractiveViewer(
+                            child: Image.memory(snapshot.data!),
+                          );
+                        }
+                        return const SizedBox(
+                          width: 50,
+                          height: 50,
+                          child: CircularProgressIndicator(),
+                        );
+                      },
+                    )
+                  : InteractiveViewer(
+                      child: Image.network(imageUrl),
+                    ),
+            ),
+          ),
         ),
       ),
     );

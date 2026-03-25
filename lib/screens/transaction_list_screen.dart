@@ -1,6 +1,8 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/services/transaction_provider.dart';
+import 'package:mamoney/services/firebase_service.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/services/auth_provider.dart';
 import 'package:intl/intl.dart';
@@ -283,38 +285,90 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                                   ),
                                 );
                               },
-                              child: ListTile(
-                                leading: Icon(
-                                  transaction.type.toString().contains('income')
-                                      ? Icons.arrow_downward
-                                      : Icons.arrow_upward,
-                                  color: transaction.type
-                                          .toString()
-                                          .contains('income')
-                                      ? Colors.green
-                                      : Colors.red,
-                                ),
-                                title: Text(transaction.description),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(transaction.category),
-                                    Text(
-                                      DateFormat('MMM dd, yyyy')
-                                          .format(transaction.date),
-                                    ),
-                                  ],
-                                ),
-                                trailing: Text(
-                                  '${transaction.type.toString().contains('income') ? '' : '-'}${formatCurrency(transaction.amount)}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: transaction.type
-                                            .toString()
-                                            .contains('income')
-                                        ? Colors.green
-                                        : Colors.red,
+                              child: Card(
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Transaction Details Row
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // Icon
+                                          Icon(
+                                            transaction.type
+                                                    .toString()
+                                                    .contains('income')
+                                                ? Icons.arrow_downward
+                                                : Icons.arrow_upward,
+                                            color: transaction.type
+                                                    .toString()
+                                                    .contains('income')
+                                                ? Colors.green
+                                                : Colors.red,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          // Title and Subtitle
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  transaction.description,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  transaction.category,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  DateFormat('MMM dd, yyyy')
+                                                      .format(
+                                                          transaction.date),
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey[500],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          // Amount
+                                          Text(
+                                            '${transaction.type.toString().contains('income') ? '' : '-'}${formatCurrency(transaction.amount)}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                              color: transaction.type
+                                                      .toString()
+                                                      .contains('income')
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      // Invoice Image Thumbnail
+                                      if (transaction.imageUrl != null &&
+                                          transaction.imageUrl!.isNotEmpty)
+                                        _buildTransactionImageWidget(
+                                            transaction.imageUrl!),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -337,6 +391,172 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
           );
         },
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildTransactionImageWidget(String imageUrl) {
+    // Handle both local and network images
+    if (imageUrl.startsWith('local://')) {
+      // Local image - fetch from SharedPreferences
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: GestureDetector(
+          onTap: () => _showImagePreview(imageUrl),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: FutureBuilder<Uint8List?>(
+              future: FirebaseService().getLocalImage(imageUrl),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Container(
+                    height: 120,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  );
+                }
+                
+                if (snapshot.hasError || snapshot.data == null) {
+                  return Container(
+                    height: 120,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: Icon(Icons.image_not_supported, color: Colors.grey),
+                    ),
+                  );
+                }
+                
+                return Stack(
+                  children: [
+                    Image.memory(
+                      snapshot.data!,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.zoom_in,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Network image - use Image.network
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: GestureDetector(
+          onTap: () => _showImagePreview(imageUrl),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Stack(
+              children: [
+                Image.network(
+                  imageUrl,
+                  height: 120,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 120,
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported, color: Colors.grey),
+                      ),
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 120,
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.zoom_in,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showImagePreview(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            color: Colors.black.withOpacity(0.9),
+            child: Center(
+              child: imageUrl.startsWith('local://')
+                  ? FutureBuilder<Uint8List?>(
+                      future: FirebaseService().getLocalImage(imageUrl),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          return InteractiveViewer(
+                            child: Image.memory(snapshot.data!),
+                          );
+                        }
+                        return const SizedBox(
+                          width: 50,
+                          height: 50,
+                          child: CircularProgressIndicator(),
+                        );
+                      },
+                    )
+                  : InteractiveViewer(
+                      child: Image.network(imageUrl),
+                    ),
+            ),
+          ),
+        ),
       ),
     );
   }

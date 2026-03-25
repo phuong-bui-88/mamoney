@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/services/firebase_service.dart';
+import 'package:mamoney/widgets/invoice_import_loading_overlay.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
@@ -15,11 +16,22 @@ class TransactionProvider extends ChangeNotifier {
   FilterType _filterType = FilterType.month; // Default filter is by month
   DateTime _selectedDate = DateTime.now();
 
+  // Invoice import state
+  InvoiceImportStep _currentImportStep = InvoiceImportStep.none;
+  double _uploadProgress = 0.0; // Progress from 0.0 to 1.0
+  double _processingProgress = 0.0; // Progress from 0.0 to 1.0
+
   List<Transaction> get transactions => _transactions;
   bool get isLoading => _isLoading;
   String? get error => _error;
   FilterType get filterType => _filterType;
   DateTime get selectedDate => _selectedDate;
+
+  // Invoice import state getters
+  InvoiceImportStep get currentImportStep => _currentImportStep;
+  bool get isImporting => _currentImportStep != InvoiceImportStep.none;
+  double get uploadProgress => _uploadProgress;
+  double get processingProgress => _processingProgress;
 
   // Get filtered transactions based on filter type and selected date
   List<Transaction> get filteredTransactions {
@@ -139,16 +151,39 @@ class TransactionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Invoice import state setters
+  void setImportStep(InvoiceImportStep step) {
+    _currentImportStep = step;
+    notifyListeners();
+  }
+
+  void clearImportStep() {
+    _currentImportStep = InvoiceImportStep.none;
+    _uploadProgress = 0.0;
+    _processingProgress = 0.0;
+    notifyListeners();
+  }
+
+  void setUploadProgress(double progress) {
+    _uploadProgress = progress.clamp(0.0, 1.0);
+    notifyListeners();
+  }
+
+  void setProcessingProgress(double progress) {
+    _processingProgress = progress.clamp(0.0, 1.0);
+    notifyListeners();
+  }
+
   // Get category breakdown for a list of transactions
   // Returns a map of category names to total amounts
   Map<String, double> getCategoryBreakdown(List<Transaction> transactions) {
     final breakdown = <String, double>{};
-    
+
     for (var transaction in transactions) {
-      breakdown[transaction.category] = 
+      breakdown[transaction.category] =
           (breakdown[transaction.category] ?? 0) + transaction.amount;
     }
-    
+
     return breakdown;
   }
 

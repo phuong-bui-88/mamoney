@@ -8,6 +8,7 @@ import 'package:mamoney/services/ai_service.dart';
 import 'package:intl/intl.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mamoney/widgets/invoice_import_loading_overlay.dart';
 
 enum ChatMessageType { user, assistant }
 
@@ -155,6 +156,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   /// Show a bottom sheet to let user choose between camera and photo library
   void _showImageSourcePicker() {
+    final provider = context.read<TransactionProvider>();
+    provider.setImportStep(InvoiceImportStep.selecting);
+
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) => SafeArea(
@@ -239,6 +243,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       return;
     }
 
+    final provider = context.read<TransactionProvider>();
+
     try {
       final XFile? imageFile = await _imagePicker.pickImage(
         source: source,
@@ -246,11 +252,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       );
 
       if (imageFile == null) {
+        provider.clearImportStep();
         return; // User cancelled
       }
 
       // Store the image file for later upload
       _selectedInvoiceImage = imageFile;
+      
+      // Transition to processing step
+      provider.setImportStep(InvoiceImportStep.processing);
+      provider.setProcessingProgress(0.0);
 
       setState(() {
         _isProcessingImage = true;
@@ -259,14 +270,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       _addChatMessage('📸 Processing invoice...', ChatMessageType.assistant);
 
       // Read image bytes - works on both web and mobile
+      provider.setProcessingProgress(0.2);
       final imageBytes = await imageFile.readAsBytes();
       final mediaType = imageFile.mimeType ?? 'image/jpeg';
 
+      provider.setProcessingProgress(0.5);
       final items = await AIService.parseInvoiceImage(
         null,
         imageBytes: imageBytes,
         mediaType: mediaType,
       );
+
+      provider.setProcessingProgress(0.9);
 
       if (!mounted) return;
 
@@ -279,6 +294,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         setState(() {
           _isProcessingImage = false;
         });
+        provider.clearImportStep();
         return;
       }
 
@@ -291,6 +307,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         setState(() {
           _isProcessingImage = false;
         });
+        provider.clearImportStep();
         return;
       }
 
@@ -298,6 +315,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         '✅ Found ${items.length} items in invoice. Creating transactions for all items...',
         ChatMessageType.assistant,
       );
+
+      provider.setProcessingProgress(1.0);
 
       // Ensure user is signed in
       final uid = FirebaseService().currentUser?.uid;
@@ -309,8 +328,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         setState(() {
           _isProcessingImage = false;
         });
+        provider.clearImportStep();
         return;
       }
+
+      // Transition to uploading step
+      provider.setImportStep(InvoiceImportStep.uploading);
+      provider.setUploadProgress(0.0);
 
       // Upload invoice image to Firebase and get URL
       String? invoiceImageUrl;
@@ -322,10 +346,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         print('DEBUG: No image selected for upload');
       }
 
+      // Transition to saving step
+      provider.setImportStep(InvoiceImportStep.saving);
+
       // Process and save all items
       int successCount = 0;
       double totalAmount = 0;
-      final provider = context.read<TransactionProvider>();
 
       for (final item in items) {
         final description = item['description'] ?? '';
@@ -440,6 +466,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         setState(() {
           _isProcessingImage = false;
         });
+        provider.clearImportStep();
       }
     }
   }
@@ -455,6 +482,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       setState(() {
         _isUploadingImage = true;
       });
+
+      final provider = context.read<TransactionProvider>();
+      provider.setUploadProgress(0.0);
 
       final firebaseService = FirebaseService();
       final uid = firebaseService.currentUser?.uid;
@@ -474,13 +504,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       );
 
       // Read image bytes - works on both web and mobile
+      provider.setUploadProgress(0.1);
       final imageBytes = await imageFile.readAsBytes();
       print('DEBUG _uploadInvoiceImage: Image bytes read: ${imageBytes.length} bytes');
+      
+      provider.setUploadProgress(0.2);
       
       // Use current timestamp as transaction ID for now (will be replaced with actual ID if needed)
       final transactionId = '${DateTime.now().millisecondsSinceEpoch}';
       print('DEBUG _uploadInvoiceImage: Calling uploadTransactionImage with transactionId: $transactionId');
       
+      provider.setUploadProgress(0.5);
       final imageUrl = await firebaseService.uploadTransactionImage(
         null,
         uid,
@@ -488,6 +522,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         imageBytes: imageBytes,
       );
 
+      provider.setUploadProgress(1.0);
       print('DEBUG _uploadInvoiceImage: Upload successful. URL: $imageUrl');
       _addChatMessage(
         '✅ Invoice image uploaded successfully',
@@ -1110,288 +1145,304 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          // Chat Messages Area with Completed Transactions
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount:
-                  _chatMessages.length + (_completedTransactions.length * 2),
-              itemBuilder: (context, index) {
-                // All chat messages first
-                if (index < _chatMessages.length) {
-                  return _buildChatBubble(_chatMessages[index]);
-                }
+      body: Consumer<TransactionProvider>(
+        builder: (context, provider, _) {
+          return Stack(
+            children: [
+              // Main content
+              Column(
+                children: [
+                  // Chat Messages Area with Completed Transactions
+                  Expanded(
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      itemCount:
+                          _chatMessages.length + (_completedTransactions.length * 2),
+                      itemBuilder: (context, index) {
+                        // All chat messages first
+                        if (index < _chatMessages.length) {
+                          return _buildChatBubble(_chatMessages[index]);
+                        }
 
-                // All completed transactions (each has user message + transaction card)
-                int remaining = index - _chatMessages.length;
-                int transNum = remaining ~/ 2;
-                // Order so newest transactions appear at the bottom
+                        // All completed transactions (each has user message + transaction card)
+                        int remaining = index - _chatMessages.length;
+                        int transNum = remaining ~/ 2;
+                        // Order so newest transactions appear at the bottom
 
-                if (remaining % 2 == 0) {
-                  // Show user message for this transaction
-                  return _buildChatBubble(
-                    ChatMessage(
-                      type: ChatMessageType.user,
-                      text: _completedTransactions[transNum].userMessage,
+                        if (remaining % 2 == 0) {
+                          // Show user message for this transaction
+                          return _buildChatBubble(
+                            ChatMessage(
+                              type: ChatMessageType.user,
+                              text: _completedTransactions[transNum].userMessage,
+                            ),
+                          );
+                        } else {
+                          // Show transaction card for this transaction
+                          return _buildCompletedTransactionCard(
+                              _completedTransactions[transNum]);
+                        }
+                      },
                     ),
-                  );
-                } else {
-                  // Show transaction card for this transaction
-                  return _buildCompletedTransactionCard(
-                      _completedTransactions[transNum]);
-                }
-              },
-            ),
-          ),
-          // Current in-progress transaction (if exists)
-          if (_descriptionController.text.isNotEmpty ||
-              _amountController.text.isNotEmpty)
-            SingleChildScrollView(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  children: [
-                    _buildChatBubble(
-                      ChatMessage(
-                        type: ChatMessageType.user,
-                        text: _aiMessageController.text.isNotEmpty
-                            ? _aiMessageController.text
-                            : '',
-                      ),
-                    ),
-                    _buildTransactionCard(),
-                  ],
-                ),
-              ),
-            ),
-          // Suggested Input Area
-          if (_descriptionController.text.isNotEmpty ||
-              _amountController.text.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'dinner 50, shopping 200',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
                   ),
-                ),
-              ),
-            ),
-          // Input Area
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Colors.grey[200] ?? Colors.grey),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Quick entry input
-                Row(
-                  children: [
-                    Expanded(
+                  // Current in-progress transaction (if exists)
+                  if (_descriptionController.text.isNotEmpty ||
+                      _amountController.text.isNotEmpty)
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Column(
+                          children: [
+                            _buildChatBubble(
+                              ChatMessage(
+                                type: ChatMessageType.user,
+                                text: _aiMessageController.text.isNotEmpty
+                                    ? _aiMessageController.text
+                                    : '',
+                              ),
+                            ),
+                            _buildTransactionCard(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  // Suggested Input Area
+                  if (_descriptionController.text.isNotEmpty ||
+                      _amountController.text.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.grey[100] ?? Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Colors.grey[300] ?? Colors.grey.shade300,
-                            width: 1,
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'dinner 50, shopping 200',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
                           ),
                         ),
-                        child: TextField(
-                          controller: _aiMessageController,
-                          decoration: InputDecoration(
-                            hintText: 'e.g., "va xe 30k"',
-                            hintStyle: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 14,
+                      ),
+                    ),
+                  // Input Area
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        top: BorderSide(color: Colors.grey[200] ?? Colors.grey),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Quick entry input
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100] ?? Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: Colors.grey[300] ?? Colors.grey.shade300,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: TextField(
+                                  controller: _aiMessageController,
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g., "va xe 30k"',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 14,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  maxLines: 1,
+                                  enabled: !_isParsingAI && !provider.isImporting,
+                                  onSubmitted: _isParsingAI || provider.isImporting
+                                      ? null
+                                      : (_) {
+                                          _parseAIMessage();
+                                        },
+                                ),
+                              ),
                             ),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
+                            const SizedBox(width: 8),
+                            // Camera button for invoice
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.blue,
+                              ),
+                              child: IconButton(
+                                onPressed: _isProcessingImage || _isSavingTransaction || provider.isImporting
+                                    ? null
+                                    : () {
+                                        _showImageSourcePicker();
+                                      },
+                                icon: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
-                          ),
-                          maxLines: 1,
-                          enabled: !_isParsingAI,
-                          onSubmitted: _isParsingAI
-                              ? null
-                              : (_) {
-                                  _parseAIMessage();
+                            const SizedBox(width: 8),
+                            // Send button for text input
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black,
+                              ),
+                              child: IconButton(
+                                onPressed: _isParsingAI || provider.isImporting
+                                    ? null
+                                    : () {
+                                        _parseAIMessage();
+                                      },
+                                icon: const Icon(
+                                  Icons.send,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Transaction Type Selector
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedType = TransactionType.income;
+                                    _selectedCategory = incomeCategories.first;
+                                  });
                                 },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Camera button for invoice
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.blue,
-                      ),
-                      child: IconButton(
-                        onPressed: _isProcessingImage || _isSavingTransaction
-                            ? null
-                            : () {
-                                _showImageSourcePicker();
-                              },
-                        icon: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Send button for text input
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.black,
-                      ),
-                      child: IconButton(
-                        onPressed: _isParsingAI
-                            ? null
-                            : () {
-                                _parseAIMessage();
-                              },
-                        icon: const Icon(
-                          Icons.send,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Transaction Type Selector
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedType = TransactionType.income;
-                            _selectedCategory = incomeCategories.first;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                            horizontal: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _selectedType == TransactionType.income
-                                ? Colors.green
-                                : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(12),
-                            border: _selectedType == TransactionType.income
-                                ? Border.all(
-                                    color: Colors.green.shade700, width: 2)
-                                : null,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.arrow_downward,
-                                color: _selectedType == TransactionType.income
-                                    ? Colors.white
-                                    : Colors.grey,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Income',
-                                style: TextStyle(
-                                  color: _selectedType == TransactionType.income
-                                      ? Colors.white
-                                      : Colors.grey,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _selectedType == TransactionType.income
+                                        ? Colors.green
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: _selectedType == TransactionType.income
+                                        ? Border.all(
+                                            color: Colors.green.shade700, width: 2)
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.arrow_downward,
+                                        color: _selectedType == TransactionType.income
+                                            ? Colors.white
+                                            : Colors.grey,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Income',
+                                        style: TextStyle(
+                                          color: _selectedType == TransactionType.income
+                                              ? Colors.white
+                                              : Colors.grey,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedType = TransactionType.expense;
-                            _selectedCategory = expenseCategories.first;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                            horizontal: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _selectedType == TransactionType.expense
-                                ? Colors.red
-                                : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(12),
-                            border: _selectedType == TransactionType.expense
-                                ? Border.all(
-                                    color: Colors.red.shade700, width: 2)
-                                : null,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.arrow_upward,
-                                color: _selectedType == TransactionType.expense
-                                    ? Colors.white
-                                    : Colors.grey,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Expense',
-                                style: TextStyle(
-                                  color:
-                                      _selectedType == TransactionType.expense
-                                          ? Colors.white
-                                          : Colors.grey,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedType = TransactionType.expense;
+                                    _selectedCategory = expenseCategories.first;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _selectedType == TransactionType.expense
+                                        ? Colors.red
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: _selectedType == TransactionType.expense
+                                        ? Border.all(
+                                            color: Colors.red.shade700, width: 2)
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.arrow_upward,
+                                        color: _selectedType == TransactionType.expense
+                                            ? Colors.white
+                                            : Colors.grey,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Expense',
+                                        style: TextStyle(
+                                          color:
+                                              _selectedType == TransactionType.expense
+                                                  ? Colors.white
+                                                  : Colors.grey,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              // Loading overlay when importing
+              if (provider.isImporting)
+                InvoiceImportLoadingOverlay(
+                  currentStep: provider.currentImportStep,
+                  uploadProgress: provider.uploadProgress,
+                  processingProgress: provider.processingProgress,
                 ),
-              ],
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

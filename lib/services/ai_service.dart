@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:mamoney/services/ai_config.dart';
 import 'package:logging/logging.dart';
@@ -74,7 +75,7 @@ class AIService {
             headers: headers,
             body: body,
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -509,7 +510,7 @@ class AIService {
             headers: headers,
             body: body,
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 60));
 
       _logger.info('Received response with status: ${response.statusCode}');
       _logger.fine('Response headers: ${response.headers}');
@@ -620,6 +621,13 @@ class AIService {
       }
     } catch (e, stackTrace) {
       _logger.severe('Exception in API call: $e', e, stackTrace);
+      // Provide more helpful error messages for timeout
+      if (e is TimeoutException) {
+        return {
+          'success': false,
+          'error': 'AI service timeout: Image processing took too long. Please try with a clearer or smaller invoice image.'
+        };
+      }
       return {'success': false, 'error': 'Network error: $e'};
     }
   }

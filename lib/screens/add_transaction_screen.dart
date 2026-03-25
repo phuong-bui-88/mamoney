@@ -147,15 +147,95 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   // _handleAddTransaction was unused and has been removed.
 
-  /// Capture invoice image from camera and parse it
-  Future<void> _captureAndParseInvoice() async {
+  /// Show a bottom sheet to let user choose between camera and photo library
+  void _showImageSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) => SafeArea(
+        child: Container(
+          height: 150,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Select Image Source',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Camera option
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _captureAndParseInvoice(ImageSource.camera);
+                    },
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.blue.shade100,
+                          ),
+                          child: Icon(
+                            Icons.camera_alt,
+                            color: Colors.blue,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text('Camera'),
+                      ],
+                    ),
+                  ),
+                  // Photo Library option
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _captureAndParseInvoice(ImageSource.gallery);
+                    },
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.green.shade100,
+                          ),
+                          child: Icon(
+                            Icons.photo_library,
+                            color: Colors.green,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text('Photo Library'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Capture invoice image from camera or photo library and parse it
+  Future<void> _captureAndParseInvoice(ImageSource source) async {
     if (_isProcessingImage || _isSavingTransaction) {
       return;
     }
 
     try {
       final XFile? imageFile = await _imagePicker.pickImage(
-        source: ImageSource.camera,
+        source: source,
         imageQuality: 85,
       );
 
@@ -913,7 +993,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         onPressed: _isProcessingImage || _isSavingTransaction
                             ? null
                             : () {
-                                _captureAndParseInvoice();
+                                _showImageSourcePicker();
                               },
                         icon: const Icon(
                           Icons.camera_alt,

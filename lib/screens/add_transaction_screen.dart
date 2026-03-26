@@ -258,7 +258,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
       // Store the image file for later upload
       _selectedInvoiceImage = imageFile;
-      
+
       // Transition to processing step
       provider.setImportStep(InvoiceImportStep.processing);
       provider.setProcessingProgress(0.0);
@@ -506,14 +506,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       // Read image bytes - works on both web and mobile
       provider.setUploadProgress(0.1);
       final imageBytes = await imageFile.readAsBytes();
-      print('DEBUG _uploadInvoiceImage: Image bytes read: ${imageBytes.length} bytes');
-      
+      print(
+          'DEBUG _uploadInvoiceImage: Image bytes read: ${imageBytes.length} bytes');
+
       provider.setUploadProgress(0.2);
-      
+
       // Use current timestamp as transaction ID for now (will be replaced with actual ID if needed)
       final transactionId = '${DateTime.now().millisecondsSinceEpoch}';
-      print('DEBUG _uploadInvoiceImage: Calling uploadTransactionImage with transactionId: $transactionId');
-      
+      print(
+          'DEBUG _uploadInvoiceImage: Calling uploadTransactionImage with transactionId: $transactionId');
+
       provider.setUploadProgress(0.5);
       final imageUrl = await firebaseService.uploadTransactionImage(
         null,
@@ -866,17 +868,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     ),
                   );
                 }
-                
+
                 if (snapshot.hasError || snapshot.data == null) {
                   return Container(
                     height: 120,
                     color: Colors.grey[200],
                     child: const Center(
-                      child: Icon(Icons.image_not_supported, color: Colors.grey),
+                      child:
+                          Icon(Icons.image_not_supported, color: Colors.grey),
                     ),
                   );
                 }
-                
+
                 return Stack(
                   children: [
                     Image.memory(
@@ -927,7 +930,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       height: 120,
                       color: Colors.grey[200],
                       child: const Center(
-                        child: Icon(Icons.image_not_supported, color: Colors.grey),
+                        child:
+                            Icon(Icons.image_not_supported, color: Colors.grey),
                       ),
                     );
                   },
@@ -1156,9 +1160,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   Expanded(
                     child: ListView.builder(
                       controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      itemCount:
-                          _chatMessages.length + (_completedTransactions.length * 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      itemCount: _chatMessages.length +
+                          (_completedTransactions.length * 2),
                       itemBuilder: (context, index) {
                         // All chat messages first
                         if (index < _chatMessages.length) {
@@ -1175,7 +1180,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                           return _buildChatBubble(
                             ChatMessage(
                               type: ChatMessageType.user,
-                              text: _completedTransactions[transNum].userMessage,
+                              text:
+                                  _completedTransactions[transNum].userMessage,
                             ),
                           );
                         } else {
@@ -1191,8 +1197,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       _amountController.text.isNotEmpty)
                     SingleChildScrollView(
                       child: Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         child: Column(
                           children: [
                             _buildChatBubble(
@@ -1212,10 +1218,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   if (_descriptionController.text.isNotEmpty ||
                       _amountController.text.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: Colors.grey[100],
                           borderRadius: BorderRadius.circular(20),
@@ -1247,10 +1254,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             Expanded(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.grey[100] ?? Colors.grey.shade100,
+                                  color:
+                                      Colors.grey[100] ?? Colors.grey.shade100,
                                   borderRadius: BorderRadius.circular(24),
                                   border: Border.all(
-                                    color: Colors.grey[300] ?? Colors.grey.shade300,
+                                    color: Colors.grey[300] ??
+                                        Colors.grey.shade300,
                                     width: 1,
                                   ),
                                 ),
@@ -1269,12 +1278,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                                     ),
                                   ),
                                   maxLines: 1,
-                                  enabled: !_isParsingAI && !provider.isImporting,
-                                  onSubmitted: _isParsingAI || provider.isImporting
-                                      ? null
-                                      : (_) {
-                                          _parseAIMessage();
-                                        },
+                                  enabled:
+                                      !_isParsingAI && !provider.isImporting,
+                                  onSubmitted:
+                                      _isParsingAI || provider.isImporting
+                                          ? null
+                                          : (_) {
+                                              _parseAIMessage();
+                                            },
                                 ),
                               ),
                             ),
@@ -1288,7 +1299,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                                 color: Colors.blue,
                               ),
                               child: IconButton(
-                                onPressed: _isProcessingImage || _isSavingTransaction || provider.isImporting
+                                onPressed: _isProcessingImage ||
+                                        _isSavingTransaction ||
+                                        provider.isImporting
                                     ? null
                                     : () {
                                         _showImageSourcePicker();
@@ -1340,21 +1353,25 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                                     horizontal: 16,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: _selectedType == TransactionType.income
-                                        ? Colors.green
-                                        : Colors.grey[200],
+                                    color:
+                                        _selectedType == TransactionType.income
+                                            ? Colors.green
+                                            : Colors.grey[200],
                                     borderRadius: BorderRadius.circular(12),
-                                    border: _selectedType == TransactionType.income
-                                        ? Border.all(
-                                            color: Colors.green.shade700, width: 2)
-                                        : null,
+                                    border:
+                                        _selectedType == TransactionType.income
+                                            ? Border.all(
+                                                color: Colors.green.shade700,
+                                                width: 2)
+                                            : null,
                                   ),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
                                         Icons.arrow_downward,
-                                        color: _selectedType == TransactionType.income
+                                        color: _selectedType ==
+                                                TransactionType.income
                                             ? Colors.white
                                             : Colors.grey,
                                         size: 20,
@@ -1363,7 +1380,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                                       Text(
                                         'Income',
                                         style: TextStyle(
-                                          color: _selectedType == TransactionType.income
+                                          color: _selectedType ==
+                                                  TransactionType.income
                                               ? Colors.white
                                               : Colors.grey,
                                           fontWeight: FontWeight.w600,
@@ -1390,21 +1408,25 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                                     horizontal: 16,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: _selectedType == TransactionType.expense
-                                        ? Colors.red
-                                        : Colors.grey[200],
+                                    color:
+                                        _selectedType == TransactionType.expense
+                                            ? Colors.red
+                                            : Colors.grey[200],
                                     borderRadius: BorderRadius.circular(12),
-                                    border: _selectedType == TransactionType.expense
-                                        ? Border.all(
-                                            color: Colors.red.shade700, width: 2)
-                                        : null,
+                                    border:
+                                        _selectedType == TransactionType.expense
+                                            ? Border.all(
+                                                color: Colors.red.shade700,
+                                                width: 2)
+                                            : null,
                                   ),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
                                         Icons.arrow_upward,
-                                        color: _selectedType == TransactionType.expense
+                                        color: _selectedType ==
+                                                TransactionType.expense
                                             ? Colors.white
                                             : Colors.grey,
                                         size: 20,
@@ -1413,10 +1435,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                                       Text(
                                         'Expense',
                                         style: TextStyle(
-                                          color:
-                                              _selectedType == TransactionType.expense
-                                                  ? Colors.white
-                                                  : Colors.grey,
+                                          color: _selectedType ==
+                                                  TransactionType.expense
+                                              ? Colors.white
+                                              : Colors.grey,
                                           fontWeight: FontWeight.w600,
                                           fontSize: 16,
                                         ),

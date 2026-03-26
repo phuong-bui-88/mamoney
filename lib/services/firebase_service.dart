@@ -138,11 +138,9 @@ class FirebaseService {
   // Get transactions for current user
   Stream<List<models.Transaction>> getTransactionsStream() {
     if (currentUser == null) {
-      print('[DEBUG] No current user. Returning empty transaction stream.');
       return Stream.value([]);
     }
 
-    print('[DEBUG] Fetching transactions for userId: \'${currentUser!.uid}\'');
     return _firestore
         .collection('transactions')
         .where('userId', isEqualTo: currentUser!.uid)
@@ -152,10 +150,6 @@ class FirebaseService {
       final txs = snapshot.docs
           .map((doc) => models.Transaction.fromMap(doc.data()))
           .toList();
-      print('[DEBUG] Fetched transactions count: \'${txs.length}\'');
-      for (final tx in txs) {
-        print('[DEBUG] Transaction: \'${tx.toString()}\'');
-      }
       return txs;
     });
   }
@@ -167,7 +161,8 @@ class FirebaseService {
     }
     try {
       // Fetch transaction to check for image
-      final doc = await _firestore.collection('transactions').doc(transactionId).get();
+      final doc =
+          await _firestore.collection('transactions').doc(transactionId).get();
       if (doc.exists && doc.data() != null) {
         final transaction = models.Transaction.fromMap(doc.data()!);
         // Delete image from storage if it exists
@@ -229,36 +224,40 @@ class FirebaseService {
       throw Exception('User not authenticated');
     }
     try {
-      print('DEBUG uploadTransactionImage: Starting local upload for user: $userId, transactionId: $transactionId');
-      print('DEBUG uploadTransactionImage: imageBytes provided: ${imageBytes != null}, imageFile type: ${imageFile.runtimeType}');
-      
+      print(
+          'DEBUG uploadTransactionImage: Starting local upload for user: $userId, transactionId: $transactionId');
+      print(
+          'DEBUG uploadTransactionImage: imageBytes provided: ${imageBytes != null}, imageFile type: ${imageFile.runtimeType}');
+
       // Get image bytes if not provided
       Uint8List bytesToStore = imageBytes ?? Uint8List(0);
-      
+
       if (bytesToStore.isEmpty && imageFile != null && imageFile is File) {
         bytesToStore = await imageFile.readAsBytes();
       }
-      
+
       if (bytesToStore.isEmpty) {
         throw Exception('No valid image data provided');
       }
 
       // Convert bytes to base64 for local storage
       final base64Image = base64Encode(bytesToStore);
-      
+
       // Storage key: "invoice_image_<transactionId>"
       final storageKey = 'invoice_image_$transactionId';
-      
+
       // Save to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(storageKey, base64Image);
-      
-      print('DEBUG uploadTransactionImage: Image saved locally. Storage key: $storageKey, Size: ${bytesToStore.length} bytes');
-      
+
+      print(
+          'DEBUG uploadTransactionImage: Image saved locally. Storage key: $storageKey, Size: ${bytesToStore.length} bytes');
+
       // Return a special marker to identify local storage images
       final imageUrl = 'local://$storageKey';
-      print('DEBUG uploadTransactionImage: Returning local image URL: $imageUrl');
-      
+      print(
+          'DEBUG uploadTransactionImage: Returning local image URL: $imageUrl');
+
       return imageUrl;
     } catch (e) {
       print('ERROR uploadTransactionImage: Exception - $e');
@@ -274,10 +273,11 @@ class FirebaseService {
         final storageKey = imageUrl.replaceFirst('local://', '');
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(storageKey);
-        print('DEBUG deleteTransactionImage: Deleted local image with key: $storageKey');
+        print(
+            'DEBUG deleteTransactionImage: Deleted local image with key: $storageKey');
         return;
       }
-      
+
       // Otherwise try to delete from Firebase (backward compatibility)
       if (_isInitialized) {
         final ref = _storage.refFromURL(imageUrl);
@@ -296,18 +296,19 @@ class FirebaseService {
       if (!imageUrl.startsWith('local://')) {
         return null; // Not a local image
       }
-      
+
       final storageKey = imageUrl.replaceFirst('local://', '');
       final prefs = await SharedPreferences.getInstance();
       final base64String = prefs.getString(storageKey);
-      
+
       if (base64String == null) {
         print('DEBUG getLocalImage: Image not found for key: $storageKey');
         return null;
       }
-      
+
       final imageBytes = base64Decode(base64String);
-      print('DEBUG getLocalImage: Retrieved image bytes from local storage. Key: $storageKey, Size: ${imageBytes.length}');
+      print(
+          'DEBUG getLocalImage: Retrieved image bytes from local storage. Key: $storageKey, Size: ${imageBytes.length}');
       return imageBytes;
     } catch (e) {
       print('ERROR getLocalImage: Exception - $e');

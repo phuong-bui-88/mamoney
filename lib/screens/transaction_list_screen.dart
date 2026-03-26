@@ -286,8 +286,8 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                                 );
                               },
                               child: Card(
-                                margin:
-                                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 child: Padding(
                                   padding: const EdgeInsets.all(12),
                                   child: Column(
@@ -337,8 +337,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                                                 const SizedBox(height: 2),
                                                 Text(
                                                   DateFormat('MMM dd, yyyy')
-                                                      .format(
-                                                          transaction.date),
+                                                      .format(transaction.date),
                                                   style: TextStyle(
                                                     fontSize: 12,
                                                     color: Colors.grey[500],
@@ -421,17 +420,18 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                     ),
                   );
                 }
-                
+
                 if (snapshot.hasError || snapshot.data == null) {
                   return Container(
                     height: 120,
                     color: Colors.grey[200],
                     child: const Center(
-                      child: Icon(Icons.image_not_supported, color: Colors.grey),
+                      child:
+                          Icon(Icons.image_not_supported, color: Colors.grey),
                     ),
                   );
                 }
-                
+
                 return Stack(
                   children: [
                     Image.memory(
@@ -482,7 +482,8 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                       height: 120,
                       color: Colors.grey[200],
                       child: const Center(
-                        child: Icon(Icons.image_not_supported, color: Colors.grey),
+                        child:
+                            Icon(Icons.image_not_supported, color: Colors.grey),
                       ),
                     );
                   },

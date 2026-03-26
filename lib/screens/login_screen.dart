@@ -53,10 +53,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = context.read<AuthProvider>();
 
     if (_isSignUp) {
-      print('Signing up with email: $email');
       authProvider.signUp(email, password);
     } else {
-      print('Signing in with email: $email');
       authProvider.signIn(email, password);
     }
   }

@@ -18,6 +18,8 @@ class TransactionProvider extends ChangeNotifier {
 
   // Invoice import state
   InvoiceImportStep _currentImportStep = InvoiceImportStep.none;
+  double _processingProgress = 0.0;
+  double _uploadProgress = 0.0;
 
   List<Transaction> get transactions => _transactions;
   bool get isLoading => _isLoading;
@@ -28,6 +30,8 @@ class TransactionProvider extends ChangeNotifier {
   // Invoice import state getters
   InvoiceImportStep get currentImportStep => _currentImportStep;
   bool get isImporting => _currentImportStep != InvoiceImportStep.none;
+  double get processingProgress => _processingProgress;
+  double get uploadProgress => _uploadProgress;
 
   // Get filtered transactions based on filter type and selected date
   List<Transaction> get filteredTransactions {
@@ -155,6 +159,16 @@ class TransactionProvider extends ChangeNotifier {
 
   void clearImportStep() {
     _currentImportStep = InvoiceImportStep.none;
+    notifyListeners();
+  }
+
+  void setProcessingProgress(double progress) {
+    _processingProgress = progress.clamp(0.0, 1.0);
+    notifyListeners();
+  }
+
+  void setUploadProgress(double progress) {
+    _uploadProgress = progress.clamp(0.0, 1.0);
     notifyListeners();
   }
 

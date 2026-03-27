@@ -26,16 +26,24 @@ void main() {
     });
 
     group('parseInvoiceImage', () {
-      test('returns error when GitHub token not configured', () async {
+      test('returns error with invoiceId when GitHub token not configured',
+          () async {
         final result = await AIService.parseInvoiceImage(null);
 
         // GitHub token is not configured in test environment, so this is expected
-        expect(result.isNotEmpty, true);
-        expect(result.first.containsKey('error'), true);
-        expect(result.first['error'], contains('GitHub token'));
+        expect(result, isA<Map<String, dynamic>>());
+        expect(result.containsKey('items'), true);
+        expect(result.containsKey('invoiceId'), true);
+        expect(result.containsKey('invoiceDate'), true);
+        expect(result['items'], isA<List>());
+        expect(result['items'].isNotEmpty, true);
+        expect(result['items'].first.containsKey('error'), true);
+        expect(result['items'].first['error'], contains('GitHub token'));
+        expect(result['invoiceId'], isNotNull);
       });
 
-      test('returns error when image file does not exist', () async {
+      test('returns error with invoiceId when image file does not exist',
+          () async {
         // Even with token configured, non-existent file should error
         // This test documents expected behavior if token were available
         final result = await AIService.parseInvoiceImage(
@@ -43,9 +51,14 @@ void main() {
         );
 
         // Either token error or file not found is acceptable
-        expect(result.isNotEmpty, true);
-        expect(result.first.containsKey('error'), true);
-        expect(result.first['error'], isNotEmpty);
+        expect(result, isA<Map<String, dynamic>>());
+        expect(result.containsKey('items'), true);
+        expect(result['items'], isA<List>());
+        expect(result['items'].isNotEmpty, true);
+        expect(result['items'].first.containsKey('error'), true);
+        expect(result['items'].first['error'], isNotEmpty);
+        expect(result['invoiceId'], isNotNull);
+        expect(result['invoiceDate'], isNotNull);
       });
 
       tearDown(() {

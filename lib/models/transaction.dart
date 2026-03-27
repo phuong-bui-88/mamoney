@@ -15,6 +15,8 @@ class Transaction {
   final DateTime createdAt;
   final String? userMessage; // Original user input message
   final String? imageUrl; // Invoice/receipt image URL
+  final String? invoiceId; // Groups transactions imported from same invoice
+  final DateTime? invoiceDate; // When the invoice was imported
 
   Transaction({
     required this.id,
@@ -27,6 +29,8 @@ class Transaction {
     required this.createdAt,
     this.userMessage,
     this.imageUrl,
+    this.invoiceId,
+    this.invoiceDate,
   });
 
   // Convert Transaction to JSON
@@ -42,6 +46,9 @@ class Transaction {
       'createdAt': Timestamp.fromDate(createdAt),
       'userMessage': userMessage,
       'imageUrl': imageUrl,
+      'invoiceId': invoiceId,
+      'invoiceDate':
+          invoiceDate != null ? Timestamp.fromDate(invoiceDate!) : null,
     };
   }
 
@@ -60,6 +67,10 @@ class Transaction {
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       userMessage: map['userMessage'],
       imageUrl: map['imageUrl'],
+      invoiceId: map['invoiceId'],
+      invoiceDate: map['invoiceDate'] != null
+          ? (map['invoiceDate'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -75,6 +86,8 @@ class Transaction {
     DateTime? createdAt,
     String? userMessage,
     String? imageUrl,
+    String? invoiceId,
+    DateTime? invoiceDate,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -87,6 +100,8 @@ class Transaction {
       createdAt: createdAt ?? this.createdAt,
       userMessage: userMessage ?? this.userMessage,
       imageUrl: imageUrl ?? this.imageUrl,
+      invoiceId: invoiceId ?? this.invoiceId,
+      invoiceDate: invoiceDate ?? this.invoiceDate,
     );
   }
 

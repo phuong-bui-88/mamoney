@@ -27,14 +27,10 @@ class FirebaseService {
 
   void initialize() {
     if (!_isInitialized) {
-      try {
-        _firebaseAuth = auth.FirebaseAuth.instance;
-        _firestore = FirebaseFirestore.instance;
-        _storage = FirebaseStorage.instance;
-        _isInitialized = true;
-      } catch (e) {
-        print('Firebase initialization failed: $e');
-      }
+      _firebaseAuth = auth.FirebaseAuth.instance;
+      _firestore = FirebaseFirestore.instance;
+      _storage = FirebaseStorage.instance;
+      _isInitialized = true;
     }
   }
 
@@ -167,12 +163,7 @@ class FirebaseService {
         final transaction = models.Transaction.fromMap(doc.data()!);
         // Delete image from storage if it exists
         if (transaction.imageUrl != null && transaction.imageUrl!.isNotEmpty) {
-          try {
-            await deleteTransactionImage(transaction.imageUrl!);
-          } catch (e) {
-            print('Error deleting transaction image: $e');
-            // Don't rethrow - still delete the transaction even if image cleanup fails
-          }
+          await deleteTransactionImage(transaction.imageUrl!);
         }
       }
       // Delete the transaction document
@@ -224,11 +215,6 @@ class FirebaseService {
       throw Exception('User not authenticated');
     }
     try {
-      print(
-          'DEBUG uploadTransactionImage: Starting local upload for user: $userId, transactionId: $transactionId');
-      print(
-          'DEBUG uploadTransactionImage: imageBytes provided: ${imageBytes != null}, imageFile type: ${imageFile.runtimeType}');
-
       // Get image bytes if not provided
       Uint8List bytesToStore = imageBytes ?? Uint8List(0);
 
@@ -250,17 +236,11 @@ class FirebaseService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(storageKey, base64Image);
 
-      print(
-          'DEBUG uploadTransactionImage: Image saved locally. Storage key: $storageKey, Size: ${bytesToStore.length} bytes');
-
       // Return a special marker to identify local storage images
       final imageUrl = 'local://$storageKey';
-      print(
-          'DEBUG uploadTransactionImage: Returning local image URL: $imageUrl');
 
       return imageUrl;
     } catch (e) {
-      print('ERROR uploadTransactionImage: Exception - $e');
       rethrow;
     }
   }
@@ -273,8 +253,6 @@ class FirebaseService {
         final storageKey = imageUrl.replaceFirst('local://', '');
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(storageKey);
-        print(
-            'DEBUG deleteTransactionImage: Deleted local image with key: $storageKey');
         return;
       }
 
@@ -282,37 +260,26 @@ class FirebaseService {
       if (_isInitialized) {
         final ref = _storage.refFromURL(imageUrl);
         await ref.delete();
-        print('DEBUG deleteTransactionImage: Deleted Firebase image');
       }
     } catch (e) {
-      print('Error deleting transaction image: $e');
       // Don't rethrow - allow transaction deletion even if image cleanup fails
     }
   }
 
   // Get local image as bytes (NEW METHOD)
   Future<Uint8List?> getLocalImage(String imageUrl) async {
-    try {
-      if (!imageUrl.startsWith('local://')) {
-        return null; // Not a local image
-      }
+    if (!imageUrl.startsWith('local://')) {
+      return null; // Not a local image
+    }
 
-      final storageKey = imageUrl.replaceFirst('local://', '');
-      final prefs = await SharedPreferences.getInstance();
-      final base64String = prefs.getString(storageKey);
+    final storageKey = imageUrl.replaceFirst('local://', '');
+    final prefs = await SharedPreferences.getInstance();
+    final base64String = prefs.getString(storageKey);
 
-      if (base64String == null) {
-        print('DEBUG getLocalImage: Image not found for key: $storageKey');
-        return null;
-      }
-
-      final imageBytes = base64Decode(base64String);
-      print(
-          'DEBUG getLocalImage: Retrieved image bytes from local storage. Key: $storageKey, Size: ${imageBytes.length}');
-      return imageBytes;
-    } catch (e) {
-      print('ERROR getLocalImage: Exception - $e');
+    if (base64String == null) {
       return null;
     }
+
+    return base64Decode(base64String);
   }
 }

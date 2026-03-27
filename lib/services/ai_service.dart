@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:mamoney/services/ai_config.dart';
 import 'package:logging/logging.dart';
+import 'package:uuid/uuid.dart';
 
 final _logger = Logger('AIService');
 
@@ -188,27 +189,38 @@ class AIService {
     return match?.group(0) ?? '';
   }
 
-  /// Parse invoice image to extract transaction details
+  /// Parse invoice image to extract transaction details and generate invoiceId
   /// Accepts either imageBytes directly (for web) or imagePath (for mobile)
-  /// Returns a LIST of items extracted from the invoice
-  /// Each item is a map with: {description, amount, category, type}
-  /// Returns error in first item: {error: message}
-  static Future<List<Map<String, String>>> parseInvoiceImage(
+  /// Returns a map with:
+  ///   - 'items': List of extracted items, each with {description, amount, category, type}
+  ///   - 'invoiceId': Unique ID for grouping transactions from same invoice
+  ///   - 'invoiceDate': Timestamp when invoice was imported (now)
+  /// If error, returns {'items': [{error: message}], 'invoiceId': null}
+  static Future<Map<String, dynamic>> parseInvoiceImage(
     String? imagePath, {
     Uint8List? imageBytes,
     String? mediaType,
   }) async {
     _logger.info('Starting invoice parsing: ${imagePath ?? "from bytes"}');
 
+    // Generate unique invoiceId and timestamp for this invoice import
+    final invoiceId = const Uuid().v4();
+    final invoiceDate = DateTime.now();
+    _logger.info('Generated invoiceId: $invoiceId');
+
     // Validate that GitHub token is configured
     if (AIConfig.githubToken.isEmpty) {
       _logger.warning('GitHub token not configured');
-      return [
-        {
-          'error':
-              'GitHub token not configured. Please set GITHUB_TOKEN environment variable.'
-        }
-      ];
+      return {
+        'items': [
+          {
+            'error':
+                'GitHub token not configured. Please set GITHUB_TOKEN environment variable.'
+          }
+        ],
+        'invoiceId': null,
+        'invoiceDate': null,
+      };
     }
 
     // Read image bytes
@@ -221,9 +233,13 @@ class AIService {
         _logger.info('Using provided image bytes');
         if (imageBytes.isEmpty) {
           _logger.warning('Image bytes are empty');
-          return [
-            {'error': 'Image data is empty'}
-          ];
+          return {
+            'items': [
+              {'error': 'Image data is empty'}
+            ],
+            'invoiceId': invoiceId,
+            'invoiceDate': invoiceDate,
+          };
         }
         imageData = imageBytes;
         detectedMediaType = mediaType ?? 'image/jpeg';
@@ -236,9 +252,13 @@ class AIService {
 
         if (!imageFile.existsSync()) {
           _logger.warning('Image file not found: $imagePath');
-          return [
-            {'error': 'Image file not found: $imagePath'}
-          ];
+          return {
+            'items': [
+              {'error': 'Image file not found: $imagePath'}
+            ],
+            'invoiceId': invoiceId,
+            'invoiceDate': invoiceDate,
+          };
         }
 
         _logger.info('Reading image file: ${imageFile.lengthSync()} bytes');
@@ -246,9 +266,13 @@ class AIService {
 
         if (imageData.isEmpty) {
           _logger.warning('Image file is empty: $imagePath');
-          return [
-            {'error': 'Image file is empty: $imagePath'}
-          ];
+          return {
+            'items': [
+              {'error': 'Image file is empty: $imagePath'}
+            ],
+            'invoiceId': invoiceId,
+            'invoiceDate': invoiceDate,
+          };
         }
 
         // Determine image media type from file extension
@@ -257,18 +281,26 @@ class AIService {
       } else {
         _logger.warning(
             'No image data provided (imagePath=$imagePath, imageBytes length=${imageBytes?.length})');
-        return [
-          {
-            'error':
-                'No image data provided. Please provide either imagePath or imageBytes.'
-          }
-        ];
+        return {
+          'items': [
+            {
+              'error':
+                  'No image data provided. Please provide either imagePath or imageBytes.'
+            }
+          ],
+          'invoiceId': invoiceId,
+          'invoiceDate': invoiceDate,
+        };
       }
     } catch (e, stackTrace) {
       _logger.severe('Error reading image: $e', e, stackTrace);
-      return [
-        {'error': 'Failed to read image: $e'}
-      ];
+      return {
+        'items': [
+          {'error': 'Failed to read image: $e'}
+        ],
+        'invoiceId': invoiceId,
+        'invoiceDate': invoiceDate,
+      };
     }
 
     final base64Image = base64.encode(imageData);
@@ -285,17 +317,21 @@ class AIService {
       _logger.info('Successfully parsed invoice');
       final items = _extractInvoiceLineItems(response['message']);
       _logger.info('Extracted ${items.length} items from invoice');
-      return items;
+      return {
+        'items': items,
+        'invoiceId': invoiceId,
+        'invoiceDate': invoiceDate,
+      };
     } else {
       _logger.warning('API call failed: ${response['error']}');
-      return [
-        {'error': response['error']}
-      ];
+      return {
+        'items': [
+          {'error': response['error']}
+        ],
+        'invoiceId': invoiceId,
+        'invoiceDate': invoiceDate,
+      };
     }
-    // } catch (e, stackTrace) {
-    //   _logger.severe('Exception during invoice parsing: $e', e, stackTrace);
-    //   return {'error': 'Failed to parse invoice image: $e'};
-    // }
   }
 
   /// Get media type from file extension
@@ -365,18 +401,31 @@ class AIService {
       result['description'] = itemMatch.group(1)?.trim() ?? '';
     }
 
-    // Extract AMOUNT - more robust regex that excludes trailing punctuation
-    final amountRegex = RegExp(
-        r'AMOUNT:\s*([\d,\.]+(?:\s*[\d,\.]+)*)\s*(?:\||$)',
-        caseSensitive: false);
+    // Extract AMOUNT - greedy regex to capture the complete amount number
+    // Matches all consecutive digits, commas, and dots as one unit
+    final amountRegex =
+        RegExp(r'AMOUNT:\s*([\d,\.]+)\s*(?:\||$)', caseSensitive: false);
     final amountMatch = amountRegex.firstMatch(line);
     if (amountMatch != null) {
       final amountStr = amountMatch.group(1)?.trim() ?? '';
       _logger.info('Raw amount extracted: "$amountStr" from line: "$line"');
       final cleanedAmount = _cleanupAmount(amountStr);
       _logger.info('Cleaned amount: "$cleanedAmount"');
+
+      // Validate amount: should be at least 4 digits for Vietnamese prices
+      // (Vietnamese invoices typically show prices like 1000, 50000, etc.)
       if (cleanedAmount.isNotEmpty) {
-        result['amount'] = cleanedAmount;
+        final amountNum = int.tryParse(cleanedAmount) ?? 0;
+        if (amountNum >= 1000) {
+          // Valid Vietnamese amount (at least 1000 VND)
+          result['amount'] = cleanedAmount;
+        } else if (cleanedAmount.length >= 5) {
+          // Fallback: if string is long enough, likely valid
+          result['amount'] = cleanedAmount;
+        } else {
+          _logger
+              .warning('Rejected amount $cleanedAmount: too small or invalid');
+        }
       }
     }
 
@@ -401,8 +450,11 @@ class AIService {
   /// "67.500" → "67500"
   /// "67,500.00" → "67500"
   /// "67.500,00" → "67500"
+  /// "49800" → "49800"
   static String _cleanupAmount(String amountStr) {
     if (amountStr.isEmpty) return '';
+
+    _logger.fine('_cleanupAmount input: "$amountStr"');
 
     // Remove whitespace
     var cleaned = amountStr.replaceAll(RegExp(r'\s+'), '');
@@ -412,40 +464,65 @@ class AIService {
       // Vietnamese format: 67.500,00 (dot is thousands, comma is decimal)
       if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
         // Comma comes after dot → Vietnamese format
+        _logger
+            .fine('Detected Vietnamese format (dot=thousands, comma=decimal)');
         cleaned = cleaned.replaceAll('.', '').replaceAll(',', '.');
       } else {
-        // Dot comes after comma → US/EU format
+        // Dot comes after comma → US format
+        _logger.fine('Detected US format (comma=thousands, dot=decimal)');
         cleaned = cleaned.replaceAll(',', '');
       }
     } else if (cleaned.contains(',')) {
       // Only comma: could be decimal or thousands separator
-      // If there are exactly 2 or 3 digits before comma, it's decimal (price like 500,00)
       final parts = cleaned.split(',');
-      if (parts.first.length <= 3 &&
-          parts.length == 2 &&
-          parts.last.length == 2) {
-        // Likely decimal: 500,00 or 5,00
+      final beforeComma = parts.first.length;
+      final afterComma = parts.length > 1 ? parts.last.length : 0;
+
+      if (beforeComma <= 3 && afterComma == 2) {
+        // Likely European decimal format: 500,00 or 5,00
+        _logger.fine('Detected European decimal format (comma=decimal)');
         cleaned = cleaned.replaceAll(',', '.');
       } else {
-        // Likely thousands separator (Vietnamese): keep only digits before comma
+        // Likely thousands separator (Vietnamese): remove comma
+        _logger.fine('Detected Vietnamese thousands separator (comma)');
         cleaned = cleaned.replaceAll(',', '');
       }
     } else if (cleaned.contains('.')) {
       // Only dot: could be decimal or thousands separator
-      // If there are exactly 2 or 3 digits after dot, it's decimal
       final parts = cleaned.split('.');
-      if (parts.last.length == 2 && !cleaned.contains('000')) {
-        // Likely decimal: 500.00
-        // Keep as is
+      final afterDot = parts.last.length;
+
+      if (afterDot == 3) {
+        // Likely thousands separator (49.800 → 49800): remove it
+        _logger.fine('Detected thousands separator (3 digits after dot)');
+        cleaned = cleaned.replaceAll('.', '');
+      } else if (afterDot == 2) {
+        // Could be decimal or thousands
+        // If the part before dot is > 3 digits, it's decimal (12345.00)
+        // Otherwise, likely thousands (500.00 format is rare in invoices)
+        if (parts.first.length > 3) {
+          _logger.fine(
+              'Detected decimal format (dot=decimal, ${parts.first.length} digits before dot)');
+          // Keep the dot
+        } else {
+          _logger.fine('Ambiguous: treating as thousands separator');
+          cleaned = cleaned.replaceAll('.', '');
+        }
       } else {
-        // Likely thousands separator: remove it
+        // 1 digit or 4+ digits - remove the dot
+        _logger
+            .fine('Detected thousands separator ($afterDot digits after dot)');
         cleaned = cleaned.replaceAll('.', '');
       }
     }
 
+    _logger.fine('_cleanupAmount after format detection: "$cleaned"');
+
     // Extract integer part (before any remaining decimal point)
     final parts = cleaned.split('.');
-    return parts.first;
+    final result = parts.first;
+    _logger.fine('_cleanupAmount final result: "$result"');
+    return result;
   }
 
   /// Call GitHub Models API with base64-encoded image
@@ -461,24 +538,63 @@ class AIService {
 
       const invoicePrompt =
           'Extract ALL line items from this Vietnamese invoice image exactly as shown.\n'
-          'CRITICAL INSTRUCTIONS FOR ACCURACY:\n'
+          '\n'
+          'CRITICAL - READ THIS CAREFULLY:\n'
+          '**For each item, return EXACTLY ONE AMOUNT - the rightmost/final amount only**\n'
+          '\n'
+          'STEP-BY-STEP INSTRUCTIONS:\n'
           '1. Item Name: Read from the LEFTMOST product description column\n'
-          '2. Amount: Read from the RIGHTMOST column which shows final price (usually "Thành Tiền Sau Thuế" or "Total After Tax")\n'
-          '3. IMPORTANT: Do NOT use Unit Price or Subtotal columns - only use the FINAL TOTAL column on the right\n'
-          '4. Vietnamese number format: If you see "51.500,00" that equals 51500 VND. Return it as: 51500\n'
-          '5. For each row, return: ITEM: [product name] | AMOUNT: [final amount as digits only, no dots or commas] | CATEGORY: [Food/Shopping/etc]\n'
-          'Return exactly one line per invoice item. Do NOT include totals, subtotals, or grand totals.\n'
-          'Example: ITEM: Cream đặc có đường | AMOUNT: 67500 | CATEGORY: Food';
+          '\n'
+          '2. Amount (MOST IMPORTANT - READ CAREFULLY):\n'
+          '   - Find the ROW for that item\n'
+          '   - Look at the RIGHTMOST COLUMN in that row (usually "Thành Tiền Sau Thuế")\n'
+          '   - That rightmost number is THE ONLY amount you should use\n'
+          '   - ABSOLUTELY DO NOT read from "Đơn Giá" (unit price) or middle columns\n'
+          '   - ABSOLUTELY DO NOT concatenate or combine multiple numbers from the same row\n'
+          '   - Extract just ONE final amount per item\n'
+          '\n'
+          '3. Vietnamese number format:\n'
+          '   - Format: "[thousands].[thousands],[decimal]" → e.g., "49.800,00"\n'
+          '   - Convert to integer: Remove dots and commas, keep only digits → "49800"\n'
+          '   - Examples:\n'
+          '     * "51.500,00" → 51500\n'
+          '     * "49.800,00" → 49800\n'
+          '     * "67.500" → 67500\n'
+          '\n'
+          '4. Output format (ONE line per item):\n'
+          '   ITEM: [product name] | AMOUNT: [single final amount as digits only] | CATEGORY: [category]\n'
+          '\n'
+          'VALIDATION RULES:\n'
+          '   - Amount must be a reasonable price (typically 1000+ in VND)\n'
+          '   - DO NOT output multiple amounts per item\n'
+          '   - DO NOT include totals or subtotals\n'
+          '   - DO NOT include tax rows\n'
+          '\n'
+          'EXAMPLES (notice ONE amount per item):\n'
+          'ITEM: Mì Hảo Hảo Big tôm chua cay 100g Gói | AMOUNT: 51500 | CATEGORY: Food\n'
+          'ITEM: Sữa chua uống men sống Probi dâu lốc 5 x 65 ml | AMOUNT: 49800 | CATEGORY: Food';
 
       final body = jsonEncode({
         'messages': [
           {
             'role': 'system',
-            'content': 'You are a financial assistant that extracts ALL line items from invoice/receipt images. '
-                'For invoices with multiple items, extract EACH ITEM SEPARATELY on its own line. '
-                'Each line must have the format: ITEM: [description] | AMOUNT: [amount] | CATEGORY: [category]\n'
-                'Categories: 🏠 Housing, 🍚 Food, 🚗 Transportation, 💡 Utilities, 🏥 Healthcare, 🎭 Entertainment, 🛍️ Shopping, Other. '
-                'CRITICAL RULES: 1) Extract one line per item (not totals), 2) Use FINAL PRICE column only (rightmost amount), 3) Return only numbers for amounts (no commas/dots/symbols), 4) Convert Vietnamese format: 67.500,00 → 67500'
+            'content': 'You are a strict financial invoice extraction assistant specialized in Vietnamese invoices. '
+                '\n'
+                'PRIMARY RULE: Extract EXACTLY ONE amount per item line - always from the RIGHTMOST/FINAL column.\n'
+                '\n'
+                'NEVER:\n'
+                '- Read from intermediate price columns\n'
+                '- Concatenate multiple amounts\n'
+                '- Extract unit prices\n'
+                '- Include totals or tax rows\n'
+                '\n'
+                'ALWAYS:\n'
+                '- Use the rightmost amount in each row\n'
+                '- Return format: ITEM: [name] | AMOUNT: [one amount only] | CATEGORY: [type]\n'
+                '- Convert Vietnamese: 49.800,00 → 49800 (single integer)\n'
+                '- Verify amount is reasonable (1000+ VND)\n'
+                '\n'
+                'Categories: 🏠 Housing, 🍚 Food, 🚗 Transportation, 💡 Utilities, 🏥 Healthcare, 🎭 Entertainment, 🛍️ Shopping, Other.'
           },
           {
             'role': 'user',
@@ -625,7 +741,8 @@ class AIService {
       if (e is TimeoutException) {
         return {
           'success': false,
-          'error': 'AI service timeout: Image processing took too long. Please try with a clearer or smaller invoice image.'
+          'error':
+              'AI service timeout: Image processing took too long. Please try with a clearer or smaller invoice image.'
         };
       }
       return {'success': false, 'error': 'Network error: $e'};

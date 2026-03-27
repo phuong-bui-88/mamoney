@@ -27,6 +27,7 @@ class TransactionRecord {
   final TransactionType type;
   final String userMessage;
   final String? imageUrl; // Add image URL field
+  final String? invoiceId; // Track invoice grouping
 
   TransactionRecord({
     required this.description,
@@ -36,7 +37,24 @@ class TransactionRecord {
     required this.type,
     required this.userMessage,
     this.imageUrl,
+    this.invoiceId,
   });
+}
+
+/// Local representation of a group of transactions from the same invoice
+/// Used for display in the chat UI during invoice import
+class InvoiceGroup {
+  final String invoiceId;
+  final DateTime invoiceDate;
+  final List<TransactionRecord> transactions;
+
+  InvoiceGroup({
+    required this.invoiceId,
+    required this.invoiceDate,
+    required this.transactions,
+  });
+
+  double get totalAmount => transactions.fold(0, (sum, tx) => sum + tx.amount);
 }
 
 class AddTransactionScreen extends StatefulWidget {
@@ -70,12 +88,19 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   ];
 
   final List<ChatMessage> _chatMessages = [];
-  final List<TransactionRecord> _completedTransactions = [];
+  final List<dynamic> _completedTransactions =
+      []; // Can contain TransactionRecord or InvoiceGroup
   bool _isParsingAI = false;
   bool _isSavingTransaction = false;
   bool _isProcessingImage = false;
   bool _isUploadingImage = false;
   XFile? _selectedInvoiceImage; // Store the invoice image for upload
+
+  // Invoice grouping fields
+  List<Map<String, dynamic>> _parsedInvoiceItems = [];
+  String? _currentInvoiceId;
+  DateTime? _currentInvoiceDate;
+  String? _currentInvoiceImageUrl;
 
   late TransactionType _selectedType;
   String _selectedCategory = '';
@@ -94,7 +119,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _loadOldTransactions();
   }
 
-  /// Load transactions from the last 48 hours from Firebase
+  /// Load transactions from the last 48 hours from Firebase, grouped by invoice
   void _loadOldTransactions() {
     final provider = context.read<TransactionProvider>();
     final now = DateTime.now();
@@ -110,8 +135,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     setState(() {
       _completedTransactions.clear();
+
+      // Group transactions by invoiceId
+      final Map<String, List<TransactionRecord>> invoiceGroups = {};
+      final List<TransactionRecord> nonInvoiceTransactions = [];
+
       for (final tx in oldTransactions) {
-        _completedTransactions.add(TransactionRecord(
+        final record = TransactionRecord(
           description: tx.description,
           amount: tx.amount,
           category: tx.category,
@@ -119,8 +149,61 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           type: tx.type,
           userMessage: tx.userMessage ?? tx.description,
           imageUrl: tx.imageUrl,
+          invoiceId: tx.invoiceId,
+        );
+
+        if (tx.invoiceId != null && tx.invoiceId!.isNotEmpty) {
+          // Group by invoice
+          invoiceGroups.putIfAbsent(tx.invoiceId!, () => []).add(record);
+        } else {
+          // Individual transaction
+          nonInvoiceTransactions.add(record);
+        }
+      }
+
+      // Create a mixed list of both groups and individual transactions
+      final List<dynamic> mixedList = [];
+
+      // Add invoice groups
+      for (final invoiceId in invoiceGroups.keys) {
+        final transactions = invoiceGroups[invoiceId]!;
+        final invoiceDate =
+            transactions.isNotEmpty ? transactions.first.date : now;
+        mixedList.add(InvoiceGroup(
+          invoiceId: invoiceId,
+          invoiceDate: invoiceDate,
+          transactions: transactions,
         ));
       }
+
+      // Add individual transactions
+      mixedList.addAll(nonInvoiceTransactions);
+
+      // Sort mixed list by date (oldest to newest)
+      mixedList.sort((a, b) {
+        DateTime dateA;
+        DateTime dateB;
+
+        if (a is InvoiceGroup) {
+          dateA = a.invoiceDate;
+        } else if (a is TransactionRecord) {
+          dateA = a.date;
+        } else {
+          return 0;
+        }
+
+        if (b is InvoiceGroup) {
+          dateB = b.invoiceDate;
+        } else if (b is TransactionRecord) {
+          dateB = b.date;
+        } else {
+          return 0;
+        }
+
+        return dateA.compareTo(dateB);
+      });
+
+      _completedTransactions.addAll(mixedList);
     });
   }
 
@@ -161,12 +244,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     showModalBottomSheet(
       context: context,
+      isDismissible: true,
+      enableDrag: true,
       builder: (BuildContext context) => SafeArea(
         child: Container(
-          height: 150,
           padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'Select Image Source',
@@ -230,11 +314,35 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+              // Cancel button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    // Close the importing invoice overlay when cancel is clicked
+                    provider.clearImportStep();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey.shade300,
+                    foregroundColor: Colors.black87,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
-    );
+    ).then((_) {
+      // Close the importing invoice overlay when the sheet is dismissed (including clicking outside)
+      provider.clearImportStep();
+    });
   }
 
   /// Capture invoice image from camera or photo library and parse it
@@ -275,7 +383,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final mediaType = imageFile.mimeType ?? 'image/jpeg';
 
       provider.setProcessingProgress(0.5);
-      final items = await AIService.parseInvoiceImage(
+      final parseResult = await AIService.parseInvoiceImage(
         null,
         imageBytes: imageBytes,
         mediaType: mediaType,
@@ -284,6 +392,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       provider.setProcessingProgress(0.9);
 
       if (!mounted) return;
+
+      // Extract results
+      final items = parseResult['items'] as List<Map<String, String>>? ?? [];
+      final invoiceId = parseResult['invoiceId'] as String?;
+      final invoiceDate = parseResult['invoiceDate'] as DateTime?;
 
       // Check for errors
       if (items.isNotEmpty && items.first.containsKey('error')) {
@@ -318,6 +431,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
       provider.setProcessingProgress(1.0);
 
+      // Store parsed invoice items for grouping display
+      setState(() {
+        _parsedInvoiceItems = items;
+        _currentInvoiceId =
+            invoiceId ?? 'invoice_${DateTime.now().millisecondsSinceEpoch}';
+        _currentInvoiceDate = invoiceDate;
+      });
+
       // Ensure user is signed in
       final uid = FirebaseService().currentUser?.uid;
       if (uid == null) {
@@ -339,11 +460,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       // Upload invoice image to Firebase and get URL
       String? invoiceImageUrl;
       if (_selectedInvoiceImage != null) {
-        print('DEBUG: Starting image upload...');
         invoiceImageUrl = await _uploadInvoiceImage(_selectedInvoiceImage!);
-        print('DEBUG: Image upload completed. URL: $invoiceImageUrl');
-      } else {
-        print('DEBUG: No image selected for upload');
       }
 
       // Transition to saving step
@@ -359,12 +476,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         final category = item['category'] ?? 'Other';
         final type = item['type'] ?? 'expense';
 
-        // Debug: log extracted data
-        print(
-            'DEBUG: Processing item - Description: "$description", Amount: "$amount", Category: "$category", ImageURL: $invoiceImageUrl');
-
         if (description.isEmpty || amount.isEmpty) {
-          print('DEBUG: Skipping item with empty description or amount');
           continue;
         }
 
@@ -378,12 +490,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         final cleanAmount = amount.trim().replaceAll(RegExp(r'[^\d.]'), '');
         var parsedAmount = double.tryParse(cleanAmount) ?? 0;
 
-        print(
-            'DEBUG: Amount parsing - Original: "$amount" → Cleaned: "$cleanAmount" → Parsed: $parsedAmount');
-
         // Validate amount is reasonable (not 0 or too small)
         if (parsedAmount <= 0) {
-          print('DEBUG: Skipping item with invalid amount: $parsedAmount');
           continue;
         }
 
@@ -416,6 +524,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           createdAt: DateTime.now(),
           userMessage: 'Invoice: $description',
           imageUrl: invoiceImageUrl,
+          invoiceId: invoiceId,
+          invoiceDate: invoiceDate,
         );
 
         // Save to database
@@ -448,6 +558,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         ChatMessageType.assistant,
       );
 
+      // Show grouped preview for 2 seconds before clearing
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Clear parsed invoice items and reset form
+      setState(() {
+        _parsedInvoiceItems = [];
+        _currentInvoiceId = null;
+        _currentInvoiceDate = null;
+        _currentInvoiceImageUrl = null;
+      });
+
       // Refresh transactions from Firebase
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) {
@@ -475,7 +596,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Future<String?> _uploadInvoiceImage(XFile imageFile) async {
     try {
       if (_isUploadingImage) {
-        print('DEBUG _uploadInvoiceImage: Already uploading, returning null');
         return null;
       }
 
@@ -489,7 +609,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       final firebaseService = FirebaseService();
       final uid = firebaseService.currentUser?.uid;
       if (uid == null) {
-        print('ERROR _uploadInvoiceImage: User not authenticated');
         _addChatMessage(
           'You must be signed in to upload an invoice image',
           ChatMessageType.assistant,
@@ -497,7 +616,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         return null;
       }
 
-      print('DEBUG _uploadInvoiceImage: User UID: $uid');
+      // print('DEBUG _uploadInvoiceImage: User UID: $uid');
       _addChatMessage(
         '⬆️ Uploading invoice image...',
         ChatMessageType.assistant,
@@ -506,15 +625,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       // Read image bytes - works on both web and mobile
       provider.setUploadProgress(0.1);
       final imageBytes = await imageFile.readAsBytes();
-      print(
-          'DEBUG _uploadInvoiceImage: Image bytes read: ${imageBytes.length} bytes');
+      // print(
+      //     'DEBUG _uploadInvoiceImage: Image bytes read: ${imageBytes.length} bytes');
 
       provider.setUploadProgress(0.2);
 
       // Use current timestamp as transaction ID for now (will be replaced with actual ID if needed)
       final transactionId = '${DateTime.now().millisecondsSinceEpoch}';
-      print(
-          'DEBUG _uploadInvoiceImage: Calling uploadTransactionImage with transactionId: $transactionId');
+      // print(
+      //     'DEBUG _uploadInvoiceImage: Calling uploadTransactionImage with transactionId: $transactionId');
 
       provider.setUploadProgress(0.5);
       final imageUrl = await firebaseService.uploadTransactionImage(
@@ -525,7 +644,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       );
 
       provider.setUploadProgress(1.0);
-      print('DEBUG _uploadInvoiceImage: Upload successful. URL: $imageUrl');
+      // print('DEBUG _uploadInvoiceImage: Upload successful. URL: $imageUrl');
       _addChatMessage(
         '✅ Invoice image uploaded successfully',
         ChatMessageType.assistant,
@@ -533,7 +652,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
       return imageUrl;
     } catch (e) {
-      print('ERROR _uploadInvoiceImage: Exception - $e');
       if (mounted) {
         _addChatMessage(
           'Warning: Failed to upload image - $e',
@@ -732,6 +850,347 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Build a grouped invoice preview card showing all parsed items
+  Widget _buildInvoiceGroupPreview() {
+    if (_parsedInvoiceItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    double totalAmount = 0;
+    for (final item in _parsedInvoiceItems) {
+      final amount = double.tryParse(item['amount']?.toString() ?? '0') ?? 0;
+      totalAmount += amount;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3F2FD), // Light blue background
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF90CAF9), width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '📋 Invoice Items',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Color(0xFF1976D2),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Invoice ID: ${_currentInvoiceId ?? "N/A"}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '${_parsedInvoiceItems.length} items',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF1976D2),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+
+            // Items list
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _parsedInvoiceItems.length,
+              itemBuilder: (context, index) {
+                final item = _parsedInvoiceItems[index];
+                final description = item['description'] ?? 'Unknown';
+                final amount = item['amount'] ?? '0';
+                final category = item['category'] ?? 'Other';
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              description,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              category,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade100,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '- $amount',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+
+            // Total
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Total Amount',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF1976D2),
+                  ),
+                ),
+                Text(
+                  formatCurrency(totalAmount),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build a completed invoice group card showing all transactions grouped by invoice
+  Widget _buildCompletedInvoiceGroup(InvoiceGroup group) {
+    final dateFormat = DateFormat('MMM dd, yyyy');
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3F2FD), // Light blue background
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF90CAF9), width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with icon, title, and details
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '📋 Invoice',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Color(0xFF1976D2),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        dateFormat.format(group.invoiceDate),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${group.transactions.length} items',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF1976D2),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '• ${formatCurrency(group.totalAmount)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+
+            // Items list
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: group.transactions.length,
+              itemBuilder: (context, index) {
+                final tx = group.transactions[index];
+                final emoji = tx.category.isNotEmpty
+                    ? (tx.category.indexOf(' ') > 0
+                        ? tx.category.substring(0, tx.category.indexOf(' '))
+                        : '📦')
+                    : '📦';
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  emoji,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    tx.description,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              tx.category,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade100,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '- ${formatCurrency(tx.amount)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+
+            // Total
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Total Amount',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF1976D2),
+                  ),
+                ),
+                Text(
+                  formatCurrency(group.totalAmount),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1131,6 +1590,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         ? incomeCategories
         : expenseCategories;
 
+    print('[BUILD] Current selected category: $_selectedCategory');
+
     if (!categories.contains(_selectedCategory)) {
       _selectedCategory = categories.first;
     }
@@ -1156,39 +1617,52 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               // Main content
               Column(
                 children: [
+                  // Show invoice group preview at top (if items are parsed)
+                  if (_parsedInvoiceItems.isNotEmpty)
+                    _buildInvoiceGroupPreview(),
+
                   // Chat Messages Area with Completed Transactions
                   Expanded(
                     child: ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
-                      itemCount: _chatMessages.length +
-                          (_completedTransactions.length * 2),
+                      itemCount:
+                          _chatMessages.length + _completedTransactions.length,
                       itemBuilder: (context, index) {
-                        // All chat messages first
+                        // All chat messages
                         if (index < _chatMessages.length) {
                           return _buildChatBubble(_chatMessages[index]);
                         }
 
-                        // All completed transactions (each has user message + transaction card)
-                        int remaining = index - _chatMessages.length;
-                        int transNum = remaining ~/ 2;
-                        // Order so newest transactions appear at the bottom
+                        // All completed transactions and invoice groups
+                        final itemIndex = index - _chatMessages.length;
+                        final item = _completedTransactions[itemIndex];
 
-                        if (remaining % 2 == 0) {
-                          // Show user message for this transaction
-                          return _buildChatBubble(
-                            ChatMessage(
-                              type: ChatMessageType.user,
-                              text:
-                                  _completedTransactions[transNum].userMessage,
+                        // Display invoice groups (multiple transactions grouped together)
+                        if (item is InvoiceGroup) {
+                          return _buildCompletedInvoiceGroup(item);
+                        }
+
+                        // Display individual transactions (with user message + card)
+                        if (item is TransactionRecord) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Column(
+                              children: [
+                                _buildChatBubble(
+                                  ChatMessage(
+                                    type: ChatMessageType.user,
+                                    text: item.userMessage,
+                                  ),
+                                ),
+                                _buildCompletedTransactionCard(item),
+                              ],
                             ),
                           );
-                        } else {
-                          // Show transaction card for this transaction
-                          return _buildCompletedTransactionCard(
-                              _completedTransactions[transNum]);
                         }
+
+                        return const SizedBox.shrink();
                       },
                     ),
                   ),

@@ -149,10 +149,17 @@ class TransactionProvider extends ChangeNotifier {
       await _firebaseService.deleteTransaction(transactionId);
     } catch (e) {
       _error = e.toString();
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Remove transaction from view immediately (optimistic removal for Dismissible)
+  void removeTransactionFromView(String transactionId) {
+    _transactions.removeWhere((t) => t.id == transactionId);
+    notifyListeners();
   }
 
   Future<void> updateTransaction(Transaction transaction) async {

@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:mamoney/services/firebase_service.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/services/transaction_provider.dart';
+import 'package:mamoney/widgets/rag_ai_badge.dart';
 import 'package:logging/logging.dart';
 
 final _logger = Logger('InvoiceTransactionTile');
@@ -152,6 +153,11 @@ class InvoiceTransactionTile extends StatelessWidget {
                               : Colors.red,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      // RAG AI Icon (if ragId is not null)
+                      if (transaction.ragId != null &&
+                          transaction.ragId!.isNotEmpty)
+                        const RagAiBadge(),
                     ],
                   ),
                   // Invoice Image Thumbnail (if available)

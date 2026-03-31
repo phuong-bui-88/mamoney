@@ -12,6 +12,7 @@ import 'package:mamoney/screens/edit_transaction_screen.dart';
 import 'package:mamoney/screens/add_transaction_screen.dart' hide InvoiceGroup;
 import 'package:mamoney/widgets/invoice_group_header.dart';
 import 'package:mamoney/widgets/invoice_transaction_tile.dart';
+import 'package:mamoney/widgets/rag_ai_badge.dart';
 import 'package:logging/logging.dart';
 
 final _logger = Logger('TransactionListScreen');
@@ -906,12 +907,31 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
               ),
             ),
             onDismissed: (direction) {
-              provider.deleteTransaction(transaction.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Transaction deleted successfully'),
-                ),
-              );
+              // Remove optimistically - widget MUST be removed from tree immediately
+              provider.removeTransactionFromView(transaction.id);
+              
+              // Delete in background without awaiting
+              provider.deleteTransaction(transaction.id).then((_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Transaction deleted successfully'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }).catchError((e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting transaction: $e'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              });
             },
             child: GestureDetector(
               onTap: () {
@@ -990,6 +1010,11 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                                       : Colors.red,
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          // RAG AI Icon (if ragId is not null)
+                          if (transaction.ragId != null &&
+                              transaction.ragId!.isNotEmpty)
+                            const RagAiBadge(),
                         ],
                       ),
                       // Invoice Image Thumbnail

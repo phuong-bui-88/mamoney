@@ -11,7 +11,7 @@ final _logger = Logger('AIService');
 
 class AIService {
   /// Parse AI message to extract description and amount
-  /// Example: "Bought lunch for 50 dollars" -> {description: "Bought lunch", amount: "50"}
+  /// Example: "Bought lunch for 50 dollars" -> {description: "Bought lunch", amount: "50", ragId: "chatcmpl-..."}
   static Future<Map<String, String>> parseTransactionMessage(
       String message) async {
     try {
@@ -30,6 +30,10 @@ class AIService {
 
       if (response['success']) {
         final parsed = _extractDescriptionAndAmount(response['message']);
+        // Include ragId from API response
+        if (response['ragId'] != null) {
+          parsed['ragId'] = response['ragId'].toString();
+        }
         return parsed;
       } else {
         return {'error': response['error']};
@@ -82,7 +86,8 @@ class AIService {
         final data = jsonDecode(response.body);
         final message =
             data['choices'][0]['message']['content'].toString().trim();
-        return {'success': true, 'message': message};
+        final ragId = data['id']?.toString() ?? '';
+        return {'success': true, 'message': message, 'ragId': ragId};
       } else if (response.statusCode == 401) {
         return {
           'success': false,

@@ -551,5 +551,108 @@ void main() {
         expect(TransactionType.expense.toString(), contains('expense'));
       });
     });
+
+    group('isAIGenerated field', () {
+      test('should default to null (not AI-generated)', () {
+        final transaction = Transaction(
+          id: 'test-id',
+          userId: 'user-123',
+          description: 'Test',
+          amount: 100,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+        );
+
+        expect(transaction.ragId, isNull);
+      });
+
+      test('should store ragId from AI response', () {
+        final transaction = Transaction(
+          id: 'test-id',
+          userId: 'user-123',
+          description: 'Test',
+          amount: 100,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+          ragId: 'chatcmpl-DPLrzus96g1LbSSIJy33NZektkNls',
+        );
+
+        expect(transaction.ragId, 'chatcmpl-DPLrzus96g1LbSSIJy33NZektkNls');
+      });
+
+      test('should include ragId in toMap', () {
+        final transaction = Transaction(
+          id: 'test-id',
+          userId: 'user-123',
+          description: 'Test',
+          amount: 100,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+          ragId: 'chatcmpl-123',
+        );
+
+        final map = transaction.toMap();
+        expect(map['ragId'], 'chatcmpl-123');
+      });
+
+      test('should parse ragId from map', () {
+        final now = DateTime.now();
+        final map = {
+          'id': 'test-id',
+          'userId': 'user-123',
+          'description': 'Test',
+          'amount': 100.0,
+          'type': 'expense',
+          'category': 'Food',
+          'date': Timestamp.fromDate(now),
+          'createdAt': Timestamp.fromDate(now),
+          'ragId': 'chatcmpl-456',
+        };
+
+        final transaction = Transaction.fromMap(map);
+        expect(transaction.ragId, 'chatcmpl-456');
+      });
+
+      test('should default to null when ragId missing from map', () {
+        final map = {
+          'id': 'test-id',
+          'userId': 'user-123',
+          'description': 'Test',
+          'amount': 100.0,
+          'type': 'expense',
+          'category': 'Food',
+          'date': Timestamp.now(),
+          'createdAt': Timestamp.now(),
+        };
+
+        final transaction = Transaction.fromMap(map);
+        expect(transaction.ragId, isNull);
+      });
+
+      test('should copy with new ragId value', () {
+        final original = Transaction(
+          id: 'test-id',
+          userId: 'user-123',
+          description: 'Test',
+          amount: 100,
+          type: TransactionType.expense,
+          category: 'Food',
+          date: DateTime.now(),
+          createdAt: DateTime.now(),
+          ragId: 'chatcmpl-old',
+        );
+
+        final copied = original.copyWith(ragId: 'chatcmpl-new');
+
+        expect(copied.ragId, 'chatcmpl-new');
+        expect(original.ragId, 'chatcmpl-old');
+      });
+    });
   });
 }

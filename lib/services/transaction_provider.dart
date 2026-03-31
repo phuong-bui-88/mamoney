@@ -121,17 +121,19 @@ class TransactionProvider extends ChangeNotifier {
     _initializeTransactionStream();
   }
 
-  Future<void> addTransaction(Transaction transaction) async {
+  Future<String> addTransaction(Transaction transaction) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _firebaseService.addTransaction(transaction);
+      final id = await _firebaseService.addTransaction(transaction);
       // Do NOT add optimistically - let the Firebase stream handle it
       // This prevents duplicates from both manual add and stream listener
+      return id;
     } catch (e) {
       _error = e.toString();
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();

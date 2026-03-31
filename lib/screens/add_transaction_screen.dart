@@ -9,6 +9,9 @@ import 'package:intl/intl.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mamoney/widgets/invoice_import_loading_overlay.dart';
+import 'package:logging/logging.dart';
+
+final _logger = Logger('AddTransactionScreen');
 
 enum ChatMessageType { user, assistant }
 
@@ -526,16 +529,16 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         );
 
         // Save to database
-        await provider.addTransaction(transaction);
-
-        if (provider.error != null) {
-          _addChatMessage(
-            '❌ Failed to save: $description - ${provider.error}',
-            ChatMessageType.assistant,
-          );
-        } else {
+        try {
+          final savedId = await provider.addTransaction(transaction);
+          _logger.info('Invoice item saved with ID: $savedId');
           successCount++;
           totalAmount += parsedAmount;
+        } catch (e) {
+          _addChatMessage(
+            '❌ Failed to save: $description - $e',
+            ChatMessageType.assistant,
+          );
         }
       }
 
@@ -700,6 +703,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         final amount = result['amount'] ?? '';
         final category = result['category'] ?? _selectedCategory;
         final type = result['type'] ?? 'expense';
+        final ragId = result['ragId']; // Extract ragId from AI response
 
         // Update selected type based on AI result
         if (type.toLowerCase() == 'income') {
@@ -741,11 +745,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             date: _selectedDate,
             createdAt: DateTime.now(),
             userMessage: userInputMessage, // Preserve the original user input
+            ragId: ragId, // Store RAG API request ID
           );
 
           // Save to database
           final provider = context.read<TransactionProvider>();
-          await provider.addTransaction(transaction);
+          final savedId = await provider.addTransaction(transaction);
+
+          _logger.info('Transaction saved with ID: $savedId');
 
           if (provider.error != null) {
             _addChatMessage(
@@ -1584,8 +1591,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final categories = _selectedType == TransactionType.income
         ? incomeCategories
         : expenseCategories;
-
-    print('[BUILD] Current selected category: $_selectedCategory');
 
     if (!categories.contains(_selectedCategory)) {
       _selectedCategory = categories.first;

@@ -17,6 +17,7 @@ class Transaction {
   final String? imageUrl; // Invoice/receipt image URL
   final String? invoiceId; // Groups transactions imported from same invoice
   final DateTime? invoiceDate; // When the invoice was imported
+  final String? ragId; // AI request ID from RAG API response (if AI-generated)
 
   Transaction({
     required this.id,
@@ -31,6 +32,7 @@ class Transaction {
     this.imageUrl,
     this.invoiceId,
     this.invoiceDate,
+    this.ragId,
   });
 
   // Convert Transaction to JSON
@@ -49,6 +51,7 @@ class Transaction {
       'invoiceId': invoiceId,
       'invoiceDate':
           invoiceDate != null ? Timestamp.fromDate(invoiceDate!) : null,
+      'ragId': ragId,
     };
   }
 
@@ -71,6 +74,7 @@ class Transaction {
       invoiceDate: map['invoiceDate'] != null
           ? (map['invoiceDate'] as Timestamp).toDate()
           : null,
+      ragId: map['ragId'],
     );
   }
 
@@ -88,6 +92,7 @@ class Transaction {
     String? imageUrl,
     String? invoiceId,
     DateTime? invoiceDate,
+    String? ragId,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -102,6 +107,7 @@ class Transaction {
       imageUrl: imageUrl ?? this.imageUrl,
       invoiceId: invoiceId ?? this.invoiceId,
       invoiceDate: invoiceDate ?? this.invoiceDate,
+      ragId: ragId ?? this.ragId,
     );
   }
 

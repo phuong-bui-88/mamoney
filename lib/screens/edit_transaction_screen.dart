@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/services/transaction_provider.dart';
+import 'package:mamoney/services/ai_service.dart';
 import 'package:intl/intl.dart';
 import 'package:mamoney/utils/input_formatters.dart';
+import 'package:mamoney/utils/category_constants.dart';
+import 'package:logging/logging.dart';
+
+final _logger = Logger('EditTransactionScreen');
 
 class EditTransactionScreen extends StatefulWidget {
   final Transaction transaction;
@@ -25,22 +30,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   late DateTime _selectedDate;
   bool _isSaving = false;
   bool _addThousands = true; // Add 000 option, default true
-
-  final List<String> incomeCategories = [
-    'Salary',
-    'Freelance',
-    'Investment',
-    'Gift',
-    'Other'
-  ];
-
-  final List<String> expenseCategories = [
-    '🏠 Housing',
-    '🍚 Food',
-    '🚗 Transportation',
-    '💡 Utilities',
-    '🏥 Healthcare'
-  ];
 
   @override
   void initState() {
@@ -79,71 +68,89 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   }
 
   Future<void> _handleUpdateTransaction() async {
+    final parsed = _parseAndValidateInputs();
+    if (parsed == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      await _performUpdate(parsed.description, parsed.amount);
+    } catch (e) {
+      _showSnackBar('Error: $e');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  ({String description, double amount})? _parseAndValidateInputs() {
     final description = _descriptionController.text.trim();
     final amountStr = _amountController.text.trim();
 
     if (description.isEmpty || amountStr.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      _showSnackBar('Please fill in all fields');
+      return null;
+    }
+
+    final cleanAmount = double.tryParse(amountStr.replaceAll(',', ''));
+    if (cleanAmount == null || cleanAmount <= 0) {
+      _showSnackBar('Please enter a valid amount');
+      return null;
+    }
+
+    final amount = _addThousands ? cleanAmount * 1000 : cleanAmount;
+    return (description: description, amount: amount);
+  }
+
+  Future<void> _performUpdate(String description, double amount) async {
+    String? ragId = widget.transaction.ragId;
+
+    // If transaction doesn't have a ragId, try to generate one from the description
+    if ((ragId == null || ragId.isEmpty) && description.isNotEmpty) {
+      _logger.info('Transaction missing ragId, attempting to generate from AI...');
+      try {
+        final aiMessage = '$description ${amount.toInt()}';
+        final aiResult = await AIService.parseTransactionMessage(aiMessage);
+
+        if (aiResult['ragId'] != null) {
+          ragId = aiResult['ragId'];
+          _logger.info('Generated ragId: $ragId');
+        } else {
+          _logger.warning('AI response did not include ragId');
+        }
+      } catch (e) {
+        _logger.warning('Failed to generate ragId from AI: $e');
+        // Continue with update even if ragId generation fails
+      }
+    }
+
+    final updatedTransaction = widget.transaction.copyWith(
+      description: description,
+      amount: amount,
+      type: _selectedType,
+      category: _selectedCategory,
+      date: _selectedDate,
+      ragId: ragId,
+    );
+
+    final provider = context.read<TransactionProvider>();
+    await provider.updateTransaction(updatedTransaction);
+
+    if (!mounted) return;
+
+    if (provider.error != null) {
+      _showSnackBar('Failed to update: ${provider.error}');
       return;
     }
 
-    final cleanAmountStr = amountStr.replaceAll(',', '');
-    var amount = double.tryParse(cleanAmountStr);
-    if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid amount')),
-      );
-      return;
-    }
+    _showSnackBar('Transaction updated successfully');
+    Navigator.of(context).pop();
+  }
 
-    // Apply thousand multiplier if enabled
-    if (_addThousands) {
-      amount = amount * 1000;
-    }
-
-    setState(() {
-      _isSaving = true;
-    });
-
-    try {
-      final updatedTransaction = widget.transaction.copyWith(
-        description: description,
-        amount: amount,
-        type: _selectedType,
-        category: _selectedCategory,
-        date: _selectedDate,
-      );
-
-      final provider = context.read<TransactionProvider>();
-      await provider.updateTransaction(updatedTransaction);
-
-      if (provider.error != null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update: ${provider.error}')),
-        );
-        return;
-      }
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transaction updated successfully')),
-      );
-      Navigator.of(context).pop();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
-    }
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -163,7 +170,14 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   @override
   Widget build(BuildContext context) {
     final isExpense = _selectedType == TransactionType.expense;
-    final categories = isExpense ? expenseCategories : incomeCategories;
+    final categories = isExpense
+        ? CategoryConstants.expenseCategories
+        : CategoryConstants.incomeCategories;
+
+    // Ensure initialValue is valid (exists in items list)
+    final validInitialValue = categories.contains(_selectedCategory)
+        ? _selectedCategory
+        : (categories.isNotEmpty ? categories[0] : '');
 
     return Scaffold(
       appBar: AppBar(
@@ -286,9 +300,32 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
                 ),
               const SizedBox(height: 16),
 
+              // Transaction Type
+              SegmentedButton<TransactionType>(
+                segments: const <ButtonSegment<TransactionType>>[
+                  ButtonSegment<TransactionType>(
+                    value: TransactionType.income,
+                    label: Text('Income'),
+                  ),
+                  ButtonSegment<TransactionType>(
+                    value: TransactionType.expense,
+                    label: Text('Expense'),
+                  ),
+                ],
+                selected: <TransactionType>{_selectedType},
+                onSelectionChanged: (Set<TransactionType> newSelection) {
+                  setState(() {
+                    _selectedType = newSelection.first;
+                    // Reset category when changing type
+                    _selectedCategory = '';
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+
               // Category
               DropdownButtonFormField<String>(
-                initialValue: _selectedCategory,
+                initialValue: validInitialValue,
                 decoration: InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(

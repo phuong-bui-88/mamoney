@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mamoney/widgets/invoice_import_loading_overlay.dart';
+import 'package:mamoney/utils/category_constants.dart';
 import 'package:logging/logging.dart';
 
 final _logger = Logger('AddTransactionScreen');
@@ -73,23 +74,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late TextEditingController _aiMessageController;
   late ScrollController _scrollController;
 
-  // Category definitions
-  final List<String> incomeCategories = [
-    'Salary',
-    'Freelance',
-    'Investment',
-    'Gift',
-    'Other'
-  ];
-
-  final List<String> expenseCategories = [
-    '🏠 Housing',
-    '🍚 Food',
-    '🚗 Transportation',
-    '💡 Utilities',
-    '🏥 Healthcare'
-  ];
-
   final List<ChatMessage> _chatMessages = [];
   final List<dynamic> _completedTransactions =
       []; // Can contain TransactionRecord or InvoiceGroup
@@ -116,7 +100,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _aiMessageController = TextEditingController();
     _scrollController = ScrollController();
     _selectedType = TransactionType.expense;
-    _selectedCategory = expenseCategories[0];
+    _selectedCategory = CategoryConstants.expenseCategories[0];
     _loadOldTransactions();
   }
 
@@ -497,8 +481,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
         // Validate and map category
         final categories = selectedType == TransactionType.income
-            ? incomeCategories
-            : expenseCategories;
+            ? CategoryConstants.incomeCategories
+            : CategoryConstants.expenseCategories;
 
         String validCategory = category;
 
@@ -513,6 +497,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         }
 
         // Create transaction object for database with invoice image URL
+        // Try to get ragId from AI parsing
+        String? ragId;
+        try {
+          final aiMessage = '$description ${parsedAmount.toInt()}';
+          final aiResult = await AIService.parseTransactionMessage(aiMessage);
+          if (aiResult['ragId'] != null) {
+            ragId = aiResult['ragId'];
+            _logger.info('Generated ragId for invoice item: $ragId');
+          }
+        } catch (e) {
+          _logger.warning('Failed to generate ragId for invoice item: $e');
+          // Continue without ragId if AI parsing fails
+        }
+
         final transaction = Transaction(
           id: '',
           userId: uid,
@@ -526,6 +524,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           imageUrl: invoiceImageUrl,
           invoiceId: invoiceId,
           invoiceDate: invoiceDate,
+          ragId: ragId,
         );
 
         // Save to database
@@ -729,10 +728,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
           // Validate category
           final categories = _selectedType == TransactionType.income
-              ? incomeCategories
-              : expenseCategories;
-          final validCategory =
-              categories.contains(category) ? category : _selectedCategory;
+              ? CategoryConstants.incomeCategories
+              : CategoryConstants.expenseCategories;
+
+          String validCategory = category;
+          if (!categories.contains(category)) {
+            // Try to find partial match (e.g., "Food" matches "🍚 Food")
+            final partialMatch = categories.firstWhere(
+              (cat) => cat.toLowerCase().contains(category.toLowerCase()),
+              orElse: () => categories.first,
+            );
+            validCategory = partialMatch;
+          }
 
           // Create transaction object for database
           final transaction = Transaction(
@@ -1589,9 +1596,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   Widget build(BuildContext context) {
     final categories = _selectedType == TransactionType.income
-        ? incomeCategories
-        : expenseCategories;
-
+        ? CategoryConstants.incomeCategories
+        : CategoryConstants.expenseCategories;
     if (!categories.contains(_selectedCategory)) {
       _selectedCategory = categories.first;
     }
@@ -1818,7 +1824,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                                 onTap: () {
                                   setState(() {
                                     _selectedType = TransactionType.income;
-                                    _selectedCategory = incomeCategories.first;
+                                    _selectedCategory = CategoryConstants
+                                        .incomeCategories.first;
                                   });
                                 },
                                 child: Container(
@@ -1873,7 +1880,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                                 onTap: () {
                                   setState(() {
                                     _selectedType = TransactionType.expense;
-                                    _selectedCategory = expenseCategories.first;
+                                    _selectedCategory = CategoryConstants
+                                        .expenseCategories.first;
                                   });
                                 },
                                 child: Container(

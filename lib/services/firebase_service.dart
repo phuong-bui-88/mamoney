@@ -179,6 +179,7 @@ class FirebaseService {
       return;
     }
     try {
+      // Only update editable fields, preserve metadata like ragId, invoiceId, etc.
       await _firestore
           .collection('transactions')
           .doc(transaction.id)

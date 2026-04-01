@@ -68,55 +68,21 @@ class TransactionEmbeddings {
   /// Performs semantic search by:
   /// 1. Creating a summary of all transactions
   /// 2. Matching question intent to transaction categories/types
-  /// 3. Returning aggregated transaction data for that intent
+  /// 3. Searching transaction descriptions for relevant keywords
+  /// 4. Returning aggregated transaction data for that intent
   Future<String> getRelevantTransactionContext(
     String userQuestion,
     List<Transaction> allTransactions,
   ) async {
+    print("all Transactions context for AI:\n$allTransactions");
+
     try {
       if (allTransactions.isEmpty) {
         return 'User has no transactions recorded.';
       }
 
-      // Simple semantic matching based on keywords in the question
-      final lowerQuestion = userQuestion.toLowerCase();
-
-      // Detect transaction type and category from question
-      final isAskingAboutExpenses = lowerQuestion.contains('spend') ||
-          lowerQuestion.contains('expense') ||
-          lowerQuestion.contains('spent') ||
-          lowerQuestion.contains('cost');
-
-      final isAskingAboutIncome = lowerQuestion.contains('earn') ||
-          lowerQuestion.contains('income') ||
-          lowerQuestion.contains('salary') ||
-          lowerQuestion.contains('received');
-
-      // Detect specific categories
-      final categoryMatches = _detectCategories(lowerQuestion);
-
-      // Filter transactions based on detected intent
-      List<Transaction> relevantTransactions = allTransactions.where((tx) {
-        // Filter by type (income/expense)
-        if (isAskingAboutExpenses && tx.type != TransactionType.expense) {
-          return false;
-        }
-        if (isAskingAboutIncome && tx.type != TransactionType.income) {
-          return false;
-        }
-
-        // Filter by category if detected
-        if (categoryMatches.isNotEmpty) {
-          return categoryMatches.contains(tx.category.toLowerCase());
-        }
-
-        return true;
-      }).toList();
-
-      // If no relevant transactions found, include all
-      if (relevantTransactions.isEmpty) {
-        relevantTransactions = allTransactions;
-      }
+      // Use all transactions, no filtering
+      List<Transaction> relevantTransactions = allTransactions.toList();
 
       // Filter to last 12 months
       final now = DateTime.now();
@@ -128,79 +94,15 @@ class TransactionEmbeddings {
       relevantTransactions.sort((a, b) => b.date.compareTo(a.date));
 
       // Generate summary
-      return _generateContextSummary(
-        relevantTransactions,
-        categoryMatches,
-      );
+      return _generateContextSummary(relevantTransactions);
     } catch (e) {
       return 'Error retrieving transaction context: $e';
     }
   }
 
-  /// Detect transaction categories mentioned in the question
-  List<String> _detectCategories(String question) {
-    final Map<String, List<String>> categoryKeywords = {
-      'food': [
-        'food',
-        'restaurant',
-        'grocery',
-        'eat',
-        'meal',
-        'lunch',
-        'dinner',
-        'breakfast'
-      ],
-      'transport': [
-        'transport',
-        'car',
-        'gas',
-        'fuel',
-        'taxi',
-        'bus',
-        'train',
-        'flight'
-      ],
-      'utilities': [
-        'utility',
-        'electric',
-        'water',
-        'internet',
-        'phone',
-        'bill'
-      ],
-      'entertainment': [
-        'entertainment',
-        'movie',
-        'game',
-        'music',
-        'concert',
-        'show'
-      ],
-      'health': [
-        'health',
-        'doctor',
-        'medicine',
-        'hospital',
-        'medication',
-        'gym'
-      ],
-      'shopping': ['shopping', 'clothes', 'buy', 'purchase', 'shop', 'mall'],
-    };
-
-    final detected = <String>[];
-    categoryKeywords.forEach((category, keywords) {
-      if (keywords.any((keyword) => question.contains(keyword))) {
-        detected.add(category);
-      }
-    });
-
-    return detected;
-  }
-
   /// Generate a concise summary of transaction context
   String _generateContextSummary(
     List<Transaction> transactions,
-    List<String> relevantCategories,
   ) {
     if (transactions.isEmpty) {
       return 'No relevant transactions found.';
@@ -235,9 +137,14 @@ class TransactionEmbeddings {
           '- Date range: ${oldestDate.toString().split(' ')[0]} to ${newestDate.toString().split(' ')[0]}');
     }
 
-    // Show sample transactions
-    context.writeln('\nRecent transactions (sample):');
-    for (final tx in transactions.take(5)) {
+    // Show all transactions sorted by amount (largest first)
+    // This helps the AI accurately identify all expenses/income
+    final sortedByAmount = List<Transaction>.from(transactions)
+      ..sort((a, b) => b.amount.compareTo(a.amount));
+
+    context.writeln('\nAll transactions by amount:');
+    print("All transactions by amount: \n$sortedByAmount");
+    for (final tx in sortedByAmount) {
       context.writeln(
           '- ${tx.date.toString().split(' ')[0]}: ${tx.description} (${tx.type}, ${tx.category}) - \$${tx.amount}');
     }

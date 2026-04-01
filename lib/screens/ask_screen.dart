@@ -76,9 +76,13 @@ class _AskScreenState extends State<AskScreen> {
         transactionProvider.transactions,
       );
 
+      print('Transaction context for AI: $transactionContext');
+
       // Get financial knowledge base context
       final financialContext =
           FinancialKnowledgeBase.getRelevantKnowledge(message);
+
+      print('Financial knowledge context for AI: $financialContext');
 
       // Ask AI with RAG context
       final aiResponse = await AIService.askFinancialQuestion(

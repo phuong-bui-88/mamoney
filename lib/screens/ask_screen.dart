@@ -6,7 +6,6 @@ import '../services/ai_service.dart';
 import '../services/chat_provider.dart';
 import '../services/transaction_embeddings.dart';
 import '../services/transaction_provider.dart';
-import '../utils/financial_knowledge_base.dart';
 
 /// AskScreen - Chat interface for asking financial questions
 /// Users can ask about their transactions or get general financial advice
@@ -78,17 +77,10 @@ class _AskScreenState extends State<AskScreen> {
 
       print('Transaction context for AI: $transactionContext');
 
-      // Get financial knowledge base context
-      final financialContext =
-          FinancialKnowledgeBase.getRelevantKnowledge(message);
-
-      print('Financial knowledge context for AI: $financialContext');
-
       // Ask AI with RAG context
       final aiResponse = await AIService.askFinancialQuestion(
         message,
         transactionContext,
-        financialContext,
       );
 
       // Add AI response to chat

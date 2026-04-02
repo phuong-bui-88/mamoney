@@ -143,7 +143,6 @@ class TransactionEmbeddings {
       ..sort((a, b) => b.amount.compareTo(a.amount));
 
     context.writeln('\nAll transactions by amount:');
-    print("All transactions by amount: \n$sortedByAmount");
     for (final tx in sortedByAmount) {
       context.writeln(
           '- ${tx.date.toString().split(' ')[0]}: ${tx.description} (${tx.type}, ${tx.category}) - \$${tx.amount}');

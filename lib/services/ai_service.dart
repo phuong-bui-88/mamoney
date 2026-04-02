@@ -758,10 +758,7 @@ class AIService {
   /// Returns the AI's response as a string
   /// For budget summaries, formats response as: "Based on your X monthly budget items: 1. Item (emoji): amount VND ... Total: amount VND"
   static Future<String> askFinancialQuestion(
-    String question,
-    String transactionContext,
-    String financialContext,
-  ) async {
+      String question, String transactionContext) async {
     try {
       // Validate that GitHub token is configured
       if (AIConfig.githubToken.isEmpty) {
@@ -773,9 +770,6 @@ You have access to the user's transaction history and financial knowledge base.
 
 ## User's Transaction Context:
 $transactionContext
-
-## Financial Knowledge Base:
-$financialContext
 
 FOR BUDGET SUMMARIES: Format responses as:
 "Based on your X monthly budget items:

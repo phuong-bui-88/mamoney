@@ -62,23 +62,6 @@ Financial Metrics to Track:
 - Net worth: Assets - Liabilities (Track annually)
 ''';
 
-  /// Get the full knowledge base text
-  static String getKnowledgeBase() {
-    final buffer = StringBuffer();
-    buffer.writeln('=== Financial Knowledge Base ===\n');
-
-    for (final entry in financialTips.entries) {
-      buffer.writeln('${entry.key.toUpperCase()}:');
-      buffer.writeln(entry.value);
-      buffer.writeln('');
-    }
-
-    buffer.writeln('GENERAL ADVICE:');
-    buffer.writeln(generalAdvice);
-
-    return buffer.toString();
-  }
-
   /// Get knowledge relevant to a specific topic
   static String getRelevantKnowledge(String topic) {
     final lowerTopic = topic.toLowerCase();

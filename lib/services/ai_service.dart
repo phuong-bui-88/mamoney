@@ -771,7 +771,17 @@ You have access to the user's transaction history and financial knowledge base.
 ## User's Transaction Context:
 $transactionContext
 
-FOR BUDGET SUMMARIES: Format responses as:
+## IMPORTANT INSTRUCTION:
+If the user asks for a TOTAL (keywords: "tổng", "total", "bao nhiêu"), respond with ONLY the total amount:
+"Total: amount VND"
+
+For example:
+- Question: "Cho tôi tổng chi trong tháng 3" → Answer: "Total: 18,685,580 VND"
+- Question: "Tổng tiêu trong tháng 2 là bao nhiêu?" → Answer: "Total: 2,700,000 VND"
+
+DO NOT show individual transactions if asked for a total.
+
+FOR DETAILED BUDGET SUMMARIES (if user doesn't ask for just a total): Format as:
 "Based on your X monthly budget items:
 1. Category (emoji): amount VND (dd-mm-yyyy)
 2. Category (emoji): amount VND (dd-mm-yyyy)

@@ -66,10 +66,10 @@ class TransactionEmbeddings {
 
   /// Get relevant transactions as context for a user's question
   /// Performs semantic search by:
-  /// 1. Creating a summary of all transactions
-  /// 2. Matching question intent to transaction categories/types
-  /// 3. Searching transaction descriptions for relevant keywords
-  /// 4. Returning aggregated transaction data for that intent
+  /// 1. Parsing question to extract month/year and type (expense/income)
+  /// 2. Filtering transactions to match the specific month/year
+  /// 3. Filtering by type if question specifies expense or income
+  /// 4. Returning aggregated transaction data for that query
   Future<String> getRelevantTransactionContext(
     String userQuestion,
     List<Transaction> allTransactions,
@@ -81,14 +81,36 @@ class TransactionEmbeddings {
         return 'User has no transactions recorded.';
       }
 
-      // Use all transactions, no filtering
+      // Parse question to extract month, year, and type
+      final queryInfo = _parseUserQuestion(userQuestion);
+      print("Parsed query info: $queryInfo");
+
       List<Transaction> relevantTransactions = allTransactions.toList();
 
-      // Filter to last 12 months
+      // Filter to last 12 months (fallback if no specific month detected)
       final now = DateTime.now();
       relevantTransactions = relevantTransactions
           .where((tx) => now.difference(tx.date).inDays <= 365)
           .toList();
+
+      // Filter by type if detected (expense/income)
+      if (queryInfo['type'] != null) {
+        final transactionType = queryInfo['type'] == 'expense'
+            ? TransactionType.expense
+            : TransactionType.income;
+        relevantTransactions = relevantTransactions
+            .where((tx) => tx.type == transactionType)
+            .toList();
+      }
+
+      // Filter by month if detected
+      if (queryInfo['month'] != null) {
+        final targetMonth = queryInfo['month'] as int;
+        final targetYear = queryInfo['year'] ?? DateTime.now().year;
+        relevantTransactions = relevantTransactions.where((tx) {
+          return tx.date.month == targetMonth && tx.date.year == targetYear;
+        }).toList();
+      }
 
       // Sort by date descending (most recent first)
       relevantTransactions.sort((a, b) => b.date.compareTo(a.date));
@@ -100,12 +122,87 @@ class TransactionEmbeddings {
     }
   }
 
+  /// Parse user question to extract month, year, and transaction type
+  /// Returns a map with 'month', 'year', and 'type' keys (all optional)
+  /// Vietnamese month: tháng 3 = month 3
+  /// Type detection: "chi" = expense, "thu" = income
+  Map<String, dynamic> _parseUserQuestion(String question) {
+    final result = <String, dynamic>{};
+    final lowerQuestion = question.toLowerCase();
+
+    // Detect month from Vietnamese patterns
+    // Patterns: "tháng 3", "tháng 1", "month 3" etc.
+    final monthPatterns = [
+      'tháng\\s+(\\d+)', // Vietnamese: tháng 3
+      'month\\s+(\\d+)', // English: month 3
+      'thang\\s+(\\d+)', // Alternative Vietnamese (without accent)
+    ];
+
+    for (final pattern in monthPatterns) {
+      final regex = RegExp(pattern, caseSensitive: false);
+      final match = regex.firstMatch(question);
+      if (match != null) {
+        final monthStr = match.group(1);
+        if (monthStr != null) {
+          int month = int.tryParse(monthStr) ?? -1;
+          if (month >= 1 && month <= 12) {
+            result['month'] = month;
+            break;
+          }
+        }
+      }
+    }
+
+    // Detect year if present
+    // Patterns: "năm 2026", "year 2026", "2026"
+    final yearPatterns = [
+      'năm\\s+(\\d{4})', // Vietnamese: năm 2026
+      'year\\s+(\\d{4})', // English: year 2026
+      '(?:tháng|month)\\s+\\d+\\s+(\\d{4})', // month X year YYYY
+    ];
+
+    for (final pattern in yearPatterns) {
+      final regex = RegExp(pattern, caseSensitive: false);
+      final match = regex.firstMatch(question);
+      if (match != null) {
+        final yearStr = match.group(1);
+        if (yearStr != null) {
+          int year = int.tryParse(yearStr) ?? -1;
+          if (year >= 2000 && year <= 2100) {
+            result['year'] = year;
+            break;
+          }
+        }
+      }
+    }
+
+    // Detect transaction type
+    if (lowerQuestion.contains('chi') || // Vietnamese: chi = expense
+        lowerQuestion.contains('tiêu') || // Vietnamese: tiêu = spend
+        lowerQuestion.contains('expense') || // English
+        lowerQuestion.contains('spent') ||
+        lowerQuestion.contains('spending')) {
+      result['type'] = 'expense';
+    } else if (lowerQuestion.contains('thu') || // Vietnamese: thu = income
+        lowerQuestion.contains('lãi') || // Vietnamese: interest
+        lowerQuestion.contains('income') || // English
+        lowerQuestion.contains('earned') ||
+        lowerQuestion.contains('salary') ||
+        lowerQuestion.contains('bonus') ||
+        lowerQuestion.contains('received')) {
+      result['type'] = 'income';
+    }
+
+    return result;
+  }
+
   /// Generate a concise summary of transaction context
+  /// Summary clearly shows all filtered transactions with totals
   String _generateContextSummary(
     List<Transaction> transactions,
   ) {
     if (transactions.isEmpty) {
-      return 'No relevant transactions found.';
+      return 'No transactions match your query. Please check the month/year/type you asked about.';
     }
 
     // Calculate totals and stats
@@ -124,29 +221,34 @@ class TransactionEmbeddings {
           : newestDate;
     }
 
-    final avgAmount = totalAmount / transactionCount;
+    final avgAmount = transactionCount > 0 ? totalAmount / transactionCount : 0;
 
     final StringBuffer context = StringBuffer();
-    context.writeln('Transaction Context:');
-    context.writeln('- Total transactions: $transactionCount');
-    context.writeln('- Total amount: \$${totalAmount.toStringAsFixed(2)}');
+    context.writeln('Transaction Context (Filtered Results):');
+    context.writeln('- Number of transactions: $transactionCount');
     context.writeln(
-        '- Average per transaction: \$${avgAmount.toStringAsFixed(2)}');
+        '- **TOTAL AMOUNT: ${totalAmount.toStringAsFixed(0)}** (This is the answer)');
+    context
+        .writeln('- Average per transaction: ${avgAmount.toStringAsFixed(0)}');
     if (oldestDate != null && newestDate != null) {
-      context.writeln(
-          '- Date range: ${oldestDate.toString().split(' ')[0]} to ${newestDate.toString().split(' ')[0]}');
+      final format =
+          '${oldestDate.year}-${oldestDate.month.toString().padLeft(2, '0')}-${oldestDate.day.toString().padLeft(2, '0')}';
+      context.writeln('- All transactions are from: $format');
     }
 
     // Show all transactions sorted by amount (largest first)
-    // This helps the AI accurately identify all expenses/income
+    // This helps the AI understand which transactions are included in the total
     final sortedByAmount = List<Transaction>.from(transactions)
       ..sort((a, b) => b.amount.compareTo(a.amount));
 
-    context.writeln('\nAll transactions by amount:');
+    context.writeln('\n=== ALL TRANSACTIONS INCLUDED IN THE TOTAL ===');
     for (final tx in sortedByAmount) {
+      final dateStr =
+          '${tx.date.year}-${tx.date.month.toString().padLeft(2, '0')}-${tx.date.day.toString().padLeft(2, '0')}';
       context.writeln(
-          '- ${tx.date.toString().split(' ')[0]}: ${tx.description} (${tx.type}, ${tx.category}) - \$${tx.amount}');
+          '- $dateStr: ${tx.description} (${tx.type}) - ${tx.amount.toStringAsFixed(0)}');
     }
+    context.writeln('=== END OF TRANSACTIONS ===');
 
     return context.toString();
   }

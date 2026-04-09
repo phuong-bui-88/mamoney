@@ -870,6 +870,33 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
             onToggleExpanded: () {
               provider.toggleInvoiceExpanded(group.invoiceId);
             },
+            onDelete: () {
+              // Remove invoice from view immediately (optimistic removal)
+              provider.removeInvoiceFromView(group.invoiceId);
+
+              // Delete in background without awaiting
+              provider.deleteInvoice(group.invoiceId).then((_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Invoice deleted successfully'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }).catchError((e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting invoice: $e'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              });
+            },
           ),
         );
 
@@ -909,7 +936,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
             onDismissed: (direction) {
               // Remove optimistically - widget MUST be removed from tree immediately
               provider.removeTransactionFromView(transaction.id);
-              
+
               // Delete in background without awaiting
               provider.deleteTransaction(transaction.id).then((_) {
                 if (context.mounted) {

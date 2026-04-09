@@ -156,9 +156,46 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
+  /// Delete all transactions with a specific invoiceId
+  Future<void> deleteInvoice(String invoiceId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // Find all transactions with this invoiceId
+      final transactionsToDelete =
+          _transactions.where((t) => t.invoiceId == invoiceId).toList();
+
+      _logger.info(
+          '[DELETE_INVOICE] Deleting ${transactionsToDelete.length} transactions for invoiceId=$invoiceId');
+
+      // Delete each transaction
+      for (final transaction in transactionsToDelete) {
+        await _firebaseService.deleteTransaction(transaction.id);
+        _logger.info('[DELETE_INVOICE] Deleted transaction: ${transaction.id}');
+      }
+
+      _logger.info('[DELETE_INVOICE] Successfully deleted invoice: $invoiceId');
+    } catch (e) {
+      _error = e.toString();
+      _logger.severe('[DELETE_INVOICE] Error deleting invoice: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Remove transaction from view immediately (optimistic removal for Dismissible)
   void removeTransactionFromView(String transactionId) {
     _transactions.removeWhere((t) => t.id == transactionId);
+    notifyListeners();
+  }
+
+  /// Remove invoice from view immediately (optimistic removal for invoice delete)
+  void removeInvoiceFromView(String invoiceId) {
+    _transactions.removeWhere((t) => t.invoiceId == invoiceId);
     notifyListeners();
   }
 

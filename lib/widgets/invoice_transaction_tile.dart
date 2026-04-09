@@ -50,10 +50,37 @@ class InvoiceTransactionTile extends StatelessWidget {
         ),
       ),
       onDismissed: (direction) {
-        context.read<TransactionProvider>().deleteTransaction(transaction.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transaction deleted successfully')),
-        );
+        // Remove optimistically - widget MUST be removed from tree immediately
+        context
+            .read<TransactionProvider>()
+            .removeTransactionFromView(transaction.id);
+
+        // Delete in background without awaiting
+        context
+            .read<TransactionProvider>()
+            .deleteTransaction(transaction.id)
+            .then((_) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Transaction deleted successfully'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }).catchError((e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error deleting transaction: $e'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        });
+
         onDelete?.call();
       },
       child: GestureDetector(

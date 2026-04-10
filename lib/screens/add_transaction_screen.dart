@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mamoney/widgets/invoice_import_loading_overlay.dart';
+import 'package:mamoney/widgets/image_source_picker_dialog.dart';
 import 'package:mamoney/utils/category_constants.dart';
 import 'package:logging/logging.dart';
 
@@ -221,114 +222,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   // _handleAddTransaction was unused and has been removed.
-
-  /// Show a bottom sheet to let user choose between camera and photo library
-  void _showImageSourcePicker() {
-    final provider = context.read<TransactionProvider>();
-    provider.setImportStep(InvoiceImportStep.selecting);
-
-    showModalBottomSheet(
-      context: context,
-      isDismissible: true,
-      enableDrag: true,
-      builder: (BuildContext context) => SafeArea(
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Select Image Source',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Camera option
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _captureAndParseInvoice(ImageSource.camera);
-                    },
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.blue.shade100,
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            color: Colors.blue,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text('Camera'),
-                      ],
-                    ),
-                  ),
-                  // Photo Library option
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _captureAndParseInvoice(ImageSource.gallery);
-                    },
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.green.shade100,
-                          ),
-                          child: const Icon(
-                            Icons.photo_library,
-                            color: Colors.green,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text('Photo Library'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              // Cancel button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    // Close the importing invoice overlay when cancel is clicked
-                    provider.clearImportStep();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey.shade300,
-                    foregroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ).then((_) {
-      // Close the importing invoice overlay when the sheet is dismissed (including clicking outside)
-      provider.clearImportStep();
-    });
-  }
 
   /// Capture invoice image from camera or photo library and parse it
   Future<void> _captureAndParseInvoice(ImageSource source) async {
@@ -1359,7 +1252,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Center(
@@ -1421,7 +1314,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Center(
@@ -1450,7 +1343,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         child: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
-            color: Colors.black.withOpacity(0.9),
+            color: Colors.black.withValues(alpha: 0.9),
             child: Center(
               child: imageUrl.startsWith('local://')
                   ? FutureBuilder<Uint8List?>(
@@ -1784,7 +1677,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                                         provider.isImporting
                                     ? null
                                     : () {
-                                        _showImageSourcePicker();
+                                        ImageSourcePickerDialog.show(
+                                          context,
+                                          onImageSourceSelected:
+                                              _captureAndParseInvoice,
+                                        );
                                       },
                                 icon: const Icon(
                                   Icons.camera_alt,

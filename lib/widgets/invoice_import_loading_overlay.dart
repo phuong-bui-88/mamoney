@@ -13,8 +13,10 @@ enum InvoiceImportStep {
 /// Shows progressive steps and blocks user interaction until import completes.
 class InvoiceImportLoadingOverlay extends StatelessWidget {
   final InvoiceImportStep currentStep;
-  final double uploadProgress; // Progress from 0.0 to 1.0 (only used during uploading step)
-  final double processingProgress; // Progress from 0.0 to 1.0 (only used during processing step)
+  final double
+      uploadProgress; // Progress from 0.0 to 1.0 (only used during uploading step)
+  final double
+      processingProgress; // Progress from 0.0 to 1.0 (only used during processing step)
 
   const InvoiceImportLoadingOverlay({
     super.key,
@@ -64,7 +66,7 @@ class InvoiceImportLoadingOverlay extends StatelessWidget {
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
           ),
         ),
         // Centered loading content
@@ -76,7 +78,7 @@ class InvoiceImportLoadingOverlay extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                 ),
@@ -99,12 +101,14 @@ class InvoiceImportLoadingOverlay extends StatelessWidget {
                   children: steps
                       .map((step) => _ImportStepTile(
                             step: step,
-                            uploadProgress: currentStep == InvoiceImportStep.uploading
-                                ? uploadProgress
-                                : 0.0,
-                            processingProgress: currentStep == InvoiceImportStep.processing
-                                ? processingProgress
-                                : 0.0,
+                            uploadProgress:
+                                currentStep == InvoiceImportStep.uploading
+                                    ? uploadProgress
+                                    : 0.0,
+                            processingProgress:
+                                currentStep == InvoiceImportStep.processing
+                                    ? processingProgress
+                                    : 0.0,
                           ))
                       .toList(),
                 ),
@@ -139,7 +143,6 @@ class _ImportStepTile extends StatelessWidget {
   final double processingProgress; // 0.0 to 1.0, only used for processing step
 
   const _ImportStepTile({
-    super.key,
     required this.step,
     this.uploadProgress = 0.0,
     this.processingProgress = 0.0,
@@ -148,11 +151,12 @@ class _ImportStepTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Determine which progress to show and calculate percentage
-    final double currentProgress = step.order == 2 ? processingProgress : uploadProgress;
+    final double currentProgress =
+        step.order == 2 ? processingProgress : uploadProgress;
     final int progressPercent = (currentProgress * 100).toInt();
-    final bool showProgress = (step.order == 2 && processingProgress > 0) || 
-                              (step.order == 3 && uploadProgress > 0);
-    
+    final bool showProgress = (step.order == 2 && processingProgress > 0) ||
+        (step.order == 3 && uploadProgress > 0);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(

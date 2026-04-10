@@ -102,6 +102,9 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   }
 
   Future<void> _performUpdate(String description, double amount) async {
+    // Read context before any async operations
+    final provider = context.read<TransactionProvider>();
+    
     String? ragId = widget.transaction.ragId;
 
     // If transaction doesn't have a ragId, try to generate one from the description
@@ -132,7 +135,6 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
       ragId: ragId,
     );
 
-    final provider = context.read<TransactionProvider>();
     await provider.updateTransaction(updatedTransaction);
 
     if (!mounted) return;

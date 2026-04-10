@@ -226,7 +226,7 @@ void main() {
           ('1', '1'),
         ];
 
-        for (final (input, expected) in amounts) {
+        for (final (input, _) in amounts) {
           final cleaned = input.replaceAll(',', '');
           final parsed = double.tryParse(cleaned);
 

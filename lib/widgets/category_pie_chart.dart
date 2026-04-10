@@ -156,7 +156,7 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
           ),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.3),
+              color: color.withValues(alpha: 0.3),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -251,7 +251,7 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
       return PieChartSectionData(
         color: isHovered
             ? colors[index % colors.length]
-            : colors[index % colors.length].withOpacity(0.7),
+            : colors[index % colors.length].withValues(alpha: 0.7),
         value: categoryEntry.value,
         title: '${percentage.toStringAsFixed(0)}%',
         radius: isHovered ? 90 : 80,

@@ -65,6 +65,8 @@ class _AskScreenState extends State<AskScreen> {
 
       // Add user message to chat
       await chatProvider.addMessage(message, 'user');
+      if (!mounted) return;
+
       _messageController.clear();
       _scrollToBottom();
 
@@ -74,26 +76,31 @@ class _AskScreenState extends State<AskScreen> {
         message,
         transactionProvider.transactions,
       );
-
-      print('Transaction context for AI: $transactionContext');
+      if (!mounted) return;
 
       // Ask AI with RAG context
       final aiResponse = await AIService.askFinancialQuestion(
         message,
         transactionContext,
       );
+      if (!mounted) return;
 
       // Add AI response to chat
       await chatProvider.addMessage(aiResponse, 'assistant');
+      if (!mounted) return;
+
       _scrollToBottom();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Error getting response: $e';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -326,11 +333,15 @@ class _AskScreenState extends State<AskScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
               final chatProvider = context.read<ChatProvider>();
+              
+              navigator.pop();
               await chatProvider.clearHistory();
+              
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(content: Text('Chat history cleared')),
                 );
               }

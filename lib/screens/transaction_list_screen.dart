@@ -357,7 +357,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Center(
@@ -419,7 +419,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Center(
@@ -448,7 +448,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
         child: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
-            color: Colors.black.withOpacity(0.9),
+            color: Colors.black.withValues(alpha: 0.9),
             child: Center(
               child: imageUrl.startsWith('local://')
                   ? FutureBuilder<Uint8List?>(

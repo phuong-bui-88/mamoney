@@ -141,8 +141,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           gradient: LinearGradient(
                             colors: [
                               Theme.of(context).primaryColor,
-                              // ignore: deprecated_member_use
-                              Theme.of(context).primaryColor.withOpacity(0.8),
+                              Theme.of(context)
+                                  .primaryColor
+                                  .withValues(alpha: 0.8),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -152,8 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             BoxShadow(
                               color: Theme.of(context)
                                   .primaryColor
-                                  // ignore: deprecated_member_use
-                                  .withOpacity(0.3),
+                                  .withValues(alpha: 0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),

@@ -27,7 +27,7 @@ class RagAiBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF7C3AED).withOpacity(0.3),
+              color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),

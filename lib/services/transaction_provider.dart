@@ -48,16 +48,8 @@ class TransactionProvider extends ChangeNotifier {
               transaction.date.month == _selectedDate.month
           : transaction.date.year == _selectedDate.year;
 
-      if (transaction.invoiceId != null && transaction.invoiceId!.isNotEmpty) {
-        _logger.warning(
-            '[FILTER] Transaction ${transaction.id} has invoiceId=${transaction.invoiceId}, '
-            'filter matches=$matches');
-      }
       return matches;
     }).toList();
-
-    _logger.info('[FILTER] filteredTransactions: ${filtered.length} total, '
-        'withInvoiceId: ${filtered.where((t) => t.invoiceId != null).length}');
     return filtered;
   }
 
@@ -92,27 +84,10 @@ class TransactionProvider extends ChangeNotifier {
 
     final transactionStream = _firebaseService.getTransactionsStream();
     _transactionSubscription = transactionStream.listen((transactions) {
-      _logger.info(
-          '[TRANSACTION STREAM] Received ${transactions.length} transactions total');
-
-      // Debug log: Check invoiceIds
-      int transactionsWithInvoiceId = 0;
-      for (final t in transactions) {
-        if (t.invoiceId != null && t.invoiceId!.isNotEmpty) {
-          transactionsWithInvoiceId++;
-          _logger.warning(
-              '[INVOICE TRANSACTION] ID: ${t.id}, InvoiceId: ${t.invoiceId}, Desc: ${t.description}');
-        }
-      }
-      _logger.info(
-          '[INVOICE COUNT] Total transactions with invoiceId: $transactionsWithInvoiceId');
-
       // Sort transactions by createdAt in ascending order (oldest to newest)
       transactions.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       _transactions = transactions;
 
-      _logger.warning(
-          '[NOTIFY] Calling notifyListeners() - about to notify $transactionsWithInvoiceId invoice transactions');
       notifyListeners();
     });
   }
@@ -167,19 +142,13 @@ class TransactionProvider extends ChangeNotifier {
       final transactionsToDelete =
           _transactions.where((t) => t.invoiceId == invoiceId).toList();
 
-      _logger.info(
-          '[DELETE_INVOICE] Deleting ${transactionsToDelete.length} transactions for invoiceId=$invoiceId');
-
       // Delete each transaction
       for (final transaction in transactionsToDelete) {
         await _firebaseService.deleteTransaction(transaction.id);
-        _logger.info('[DELETE_INVOICE] Deleted transaction: ${transaction.id}');
       }
 
-      _logger.info('[DELETE_INVOICE] Successfully deleted invoice: $invoiceId');
     } catch (e) {
       _error = e.toString();
-      _logger.severe('[DELETE_INVOICE] Error deleting invoice: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -282,9 +251,6 @@ class TransactionProvider extends ChangeNotifier {
   /// Groups transactions by invoiceId, sorts groups by invoiceDate (newest first)
   /// Returns both invoice groups and ungrouped transactions
   Map<String, dynamic> _createInvoiceGroups() {
-    _logger.info(
-        '[GROUPING] Starting to create invoice groups from ${filteredTransactions.length} filtered transactions');
-
     final invoiceGroups = <String, List<Transaction>>{};
     final ungroupedTransactions = <Transaction>[];
 
@@ -293,23 +259,16 @@ class TransactionProvider extends ChangeNotifier {
       if (transaction.invoiceId != null) {
         invoiceGroups.putIfAbsent(transaction.invoiceId!, () => []);
         invoiceGroups[transaction.invoiceId!]!.add(transaction);
-        _logger.info(
-            '[GROUPING] Added transaction ${transaction.id} to group ${transaction.invoiceId}');
       } else {
         ungroupedTransactions.add(transaction);
         _logger.fine('[GROUPING] Transaction ${transaction.id} is ungrouped');
       }
     }
 
-    _logger.info('[GROUPING] Created ${invoiceGroups.length} invoice groups');
-    _logger.info(
-        '[GROUPING] Ungrouped transactions: ${ungroupedTransactions.length}');
-
     // Create InvoiceGroup objects and sort by invoiceDate (newest first)
     final groups = invoiceGroups.entries.map((entry) {
       final transaction = entry.value.first;
-      _logger.info(
-          '[GROUPING] Creating InvoiceGroup: ${entry.key} with ${entry.value.length} transactions');
+    
       return InvoiceGroup(
         invoiceId: entry.key,
         imageUrl: transaction.imageUrl,
@@ -327,9 +286,6 @@ class TransactionProvider extends ChangeNotifier {
       }
     }
 
-    _logger.info(
-        '[GROUPING] Final: ${groups.length} invoice groups, ${ungroupedTransactions.length} ungrouped');
-
     return {
       'invoiceGroups': groups,
       'ungroupedTransactions': ungroupedTransactions,
@@ -338,20 +294,15 @@ class TransactionProvider extends ChangeNotifier {
 
   /// Get invoice groups from filtered transactions
   List<InvoiceGroup> getInvoiceGroups() {
-    _logger.info('[UI] getInvoiceGroups() called');
     final result = _createInvoiceGroups();
     final groups = result['invoiceGroups'] as List<InvoiceGroup>;
-    _logger.info('[UI] getInvoiceGroups() returning ${groups.length} groups');
     return groups;
   }
 
   /// Get ungrouped transactions (those without invoiceId)
   List<Transaction> getUngroupedTransactions() {
-    _logger.info('[UI] getUngroupedTransactions() called');
     final result = _createInvoiceGroups();
     final ungrouped = result['ungroupedTransactions'] as List<Transaction>;
-    _logger.info(
-        '[UI] getUngroupedTransactions() returning ${ungrouped.length} transactions');
     return ungrouped;
   }
 

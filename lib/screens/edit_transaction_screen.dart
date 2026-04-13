@@ -91,7 +91,7 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
       return null;
     }
 
-    final cleanAmount = double.tryParse(amountStr.replaceAll(',', ''));
+    final cleanAmount = double.tryParse(AIService.cleanupAmount(amountStr.trim()));
     if (cleanAmount == null || cleanAmount <= 0) {
       _showSnackBar('Please enter a valid amount');
       return null;
@@ -104,19 +104,19 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
   Future<void> _performUpdate(String description, double amount) async {
     // Read context before any async operations
     final provider = context.read<TransactionProvider>();
-    
+
     String? ragId = widget.transaction.ragId;
 
     // If transaction doesn't have a ragId, try to generate one from the description
     if ((ragId == null || ragId.isEmpty) && description.isNotEmpty) {
-      _logger.info('Transaction missing ragId, attempting to generate from AI...');
+      _logger
+          .info('Transaction missing ragId, attempting to generate from AI...');
       try {
         final aiMessage = '$description ${amount.toInt()}';
         final aiResult = await AIService.parseTransactionMessage(aiMessage);
 
         if (aiResult['ragId'] != null) {
           ragId = aiResult['ragId'];
-          _logger.info('Generated ragId: $ragId');
         } else {
           _logger.warning('AI response did not include ragId');
         }

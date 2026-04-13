@@ -28,15 +28,6 @@ class InvoiceTransactionTile extends StatelessWidget {
     final isFromInvoice =
         transaction.invoiceId != null && transaction.invoiceId!.isNotEmpty;
 
-    _logger.info('[TILE] Building transaction: ${transaction.description}, '
-        'isFromInvoice: $isFromInvoice');
-
-    if (isFromInvoice) {
-      _logger.warning('[TILE] ✅ BLUE BG CONDITION MET! ID: ${transaction.id}');
-    } else {
-      _logger.info('[TILE] Not from invoice: ${transaction.id}');
-    }
-
     return Dismissible(
       key: Key(transaction.id),
       direction: DismissDirection.endToStart,

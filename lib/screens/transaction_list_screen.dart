@@ -30,19 +30,15 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   @override
   void initState() {
     super.initState();
-    _logger.info('[TLS] ===== initState() CALLED =====');
   }
 
   @override
   void dispose() {
-    _logger.info('=== _TransactionListScreenState.dispose() called ===');
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    _logger.info('[TLS] build() called');
-
     try {
       return Scaffold(
         appBar: AppBar(
@@ -58,8 +54,6 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
         ),
         body: Consumer<TransactionProvider>(
           builder: (context, transactionProvider, _) {
-            _logger.info('[TLS-CONSUMER] builder entered');
-
             try {
               return Column(
                 children: [
@@ -791,15 +785,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     BuildContext context,
     TransactionProvider provider,
   ) {
-    // CRITICAL: Log immediately to see if method is called at all
-    _logger.info('[TLS-BUILD] _buildTransactionList called');
-    _logger.warning('[TLS-BUILD] ▶▶▶ METHOD ENTRY POINT ▶▶▶');
-
     try {
-      _logger.warning('[BUILD] ===== START _buildTransactionList =====');
-      final txnCount = provider.filteredTransactions.length;
-      _logger.info('[BUILD] filteredTransactions.length = $txnCount');
-
       if (provider.filteredTransactions.isEmpty) {
         _logger
             .warning('[BUILD] No filtered transactions - showing empty state');
@@ -830,30 +816,19 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
       List<InvoiceGroup> invoiceGroups = [];
       try {
         invoiceGroups = provider.getInvoiceGroups();
-        _logger.warning(
-            '[BUILD] getInvoiceGroups SUCCESS: ${invoiceGroups.length} groups');
       } catch (e, st) {
         _logger.severe('[BUILD] getInvoiceGroups ERROR: $e\n$st');
       }
 
-      _logger.warning('[BUILD] Calling getUngroupedTransactions...');
       List<Transaction> ungroupedTransactions = [];
       try {
         ungroupedTransactions = provider.getUngroupedTransactions();
-        _logger.warning(
-            '[BUILD] getUngroupedTransactions SUCCESS: ${ungroupedTransactions.length} ungrouped');
       } catch (e, st) {
         _logger.severe('[BUILD] getUngroupedTransactions ERROR: $e\n$st');
       }
 
-      _logger.info('[BUILD] invoiceGroups.length = ${invoiceGroups.length}');
-      _logger.info(
-          '[BUILD] ungroupedTransactions.length = ${ungroupedTransactions.length}');
-
       for (var i = 0; i < invoiceGroups.length; i++) {
         final group = invoiceGroups[i];
-        _logger.info(
-            '[BUILD] Invoice group $i: id=${group.invoiceId}, transactions=${group.transactions.length}');
       }
 
       // Build list items combining both invoice groups and regular transactions
@@ -861,8 +836,6 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
 
       // Add invoice groups
       for (final group in invoiceGroups) {
-        _logger
-            .info('[BUILD] Adding header for invoice group ${group.invoiceId}');
         // Add group header
         listItems.add(
           InvoiceGroupHeader(
@@ -902,8 +875,6 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
 
         // Add transactions if group is expanded
         if (provider.isInvoiceExpanded(group.invoiceId)) {
-          _logger.info(
-              '[BUILD] Invoice group ${group.invoiceId} is expanded, adding ${group.transactions.length} transactions');
           for (final transaction in group.transactions) {
             listItems.add(
               InvoiceTransactionTile(
@@ -911,14 +882,10 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
               ),
             );
           }
-        } else {
-          _logger.info('[BUILD] Invoice group ${group.invoiceId} is collapsed');
         }
       }
 
       // Add ungrouped transactions
-      _logger.info(
-          '[BUILD] Adding ${ungroupedTransactions.length} ungrouped transactions');
       for (final transaction in ungroupedTransactions) {
         listItems.add(
           Dismissible(
@@ -1057,8 +1024,6 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
         );
       }
 
-      _logger.info('[BUILD] Final listItems.length = ${listItems.length}');
-      _logger.info('[BUILD] Returning ListView with all items');
       return ListView(
         children: listItems,
       );

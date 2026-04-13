@@ -206,12 +206,9 @@ class AIService {
     Uint8List? imageBytes,
     String? mediaType,
   }) async {
-    _logger.info('Starting invoice parsing: ${imagePath ?? "from bytes"}');
-
     // Generate unique invoiceId and timestamp for this invoice import
     final invoiceId = const Uuid().v4();
     final invoiceDate = DateTime.now();
-    _logger.info('Generated invoiceId: $invoiceId');
 
     // Validate that GitHub token is configured
     if (AIConfig.githubToken.isEmpty) {
@@ -235,9 +232,7 @@ class AIService {
     try {
       if (imageBytes != null) {
         // Web: bytes passed directly
-        _logger.info('Using provided image bytes');
         if (imageBytes.isEmpty) {
-          _logger.warning('Image bytes are empty');
           return {
             'items': [
               {'error': 'Image data is empty'}
@@ -248,15 +243,11 @@ class AIService {
         }
         imageData = imageBytes;
         detectedMediaType = mediaType ?? 'image/jpeg';
-        _logger.info(
-            'Image bytes: ${imageData.length} bytes, type: $detectedMediaType');
       } else if (imagePath != null && !kIsWeb) {
         // Mobile: read from file path
-        _logger.info('Reading image file from path: $imagePath');
         final imageFile = File(imagePath);
 
         if (!imageFile.existsSync()) {
-          _logger.warning('Image file not found: $imagePath');
           return {
             'items': [
               {'error': 'Image file not found: $imagePath'}
@@ -266,11 +257,9 @@ class AIService {
           };
         }
 
-        _logger.info('Reading image file: ${imageFile.lengthSync()} bytes');
         imageData = imageFile.readAsBytesSync();
 
         if (imageData.isEmpty) {
-          _logger.warning('Image file is empty: $imagePath');
           return {
             'items': [
               {'error': 'Image file is empty: $imagePath'}
@@ -284,8 +273,6 @@ class AIService {
         final extension = imagePath.split('.').last.toLowerCase();
         detectedMediaType = _getMediaType(extension);
       } else {
-        _logger.warning(
-            'No image data provided (imagePath=$imagePath, imageBytes length=${imageBytes?.length})');
         return {
           'items': [
             {
@@ -309,19 +296,15 @@ class AIService {
     }
 
     final base64Image = base64.encode(imageData);
-    _logger.info('Image encoded to base64: ${base64Image.length} characters');
 
     // Call GitHub Models API with base64-encoded image
-    _logger.info('Calling GitHub Models API...');
     final response = await _callGitHubModelsWithImage(
       base64Image,
       detectedMediaType,
     );
 
     if (response['success']) {
-      _logger.info('Successfully parsed invoice');
       final items = _extractInvoiceLineItems(response['message']);
-      _logger.info('Extracted ${items.length} items from invoice');
       return {
         'items': items,
         'invoiceId': invoiceId,
@@ -363,27 +346,15 @@ class AIService {
     final List<Map<String, String>> items = [];
     final lines = response.split('\n');
 
-    _logger.info('Started parsing invoice response with ${lines.length} lines');
-    _logger.info('Raw API response:\n$response');
-
     for (var line in lines) {
       if (line.trim().isEmpty) continue;
 
-      _logger.info('Processing line: "$line"');
       final item = _parseInvoiceItemLine(line);
       if (item.isNotEmpty) {
         items.add(item);
         _logger
             .info('✅ Parsed item: ${item['description']} - ${item['amount']}');
       }
-    }
-
-    // If no items found, return empty list so caller knows parsing failed
-    if (items.isEmpty) {
-      _logger.warning(
-          'No items extracted from invoice response. Raw response:\n$response');
-    } else {
-      _logger.info('Successfully extracted ${items.length} items from invoice');
     }
 
     return items;
@@ -413,20 +384,19 @@ class AIService {
     final amountMatch = amountRegex.firstMatch(line);
     if (amountMatch != null) {
       final amountStr = amountMatch.group(1)?.trim() ?? '';
-      _logger.info('Raw amount extracted: "$amountStr" from line: "$line"');
-      final cleanedAmount = _cleanupAmount(amountStr);
-      _logger.info('Cleaned amount: "$cleanedAmount"');
+      final cleanedAmount = cleanupAmount(amountStr);
 
-      // Validate amount: should be at least 4 digits for Vietnamese prices
-      // (Vietnamese invoices typically show prices like 1000, 50000, etc.)
+      // Validate amount: reasonable invoice line item range (1,000-500,000 VND)
+      // Amounts > 500k are likely subtotals or grand totals and are rejected
       if (cleanedAmount.isNotEmpty) {
         final amountNum = int.tryParse(cleanedAmount) ?? 0;
-        if (amountNum >= 1000) {
-          // Valid Vietnamese amount (at least 1000 VND)
+        if (amountNum >= 1000 && amountNum <= 500000) {
+          // Valid Vietnamese line item amount
           result['amount'] = cleanedAmount;
-        } else if (cleanedAmount.length >= 5) {
-          // Fallback: if string is long enough, likely valid
-          result['amount'] = cleanedAmount;
+        } else if (amountNum > 500000) {
+          // Likely a total/subtotal - reject it
+          _logger.info(
+              'Rejected amount $amountNum: exceeds 500k (likely a total)');
         } else {
           _logger
               .warning('Rejected amount $cleanedAmount: too small or invalid');
@@ -456,10 +426,10 @@ class AIService {
   /// "67,500.00" → "67500"
   /// "67.500,00" → "67500"
   /// "49800" → "49800"
-  static String _cleanupAmount(String amountStr) {
+  static String cleanupAmount(String amountStr) {
     if (amountStr.isEmpty) return '';
 
-    _logger.fine('_cleanupAmount input: "$amountStr"');
+    _logger.fine('cleanupAmount input: "$amountStr"');
 
     // Remove whitespace
     var cleaned = amountStr.replaceAll(RegExp(r'\s+'), '');
@@ -521,12 +491,12 @@ class AIService {
       }
     }
 
-    _logger.fine('_cleanupAmount after format detection: "$cleaned"');
+    _logger.fine('cleanupAmount after format detection: "$cleaned"');
 
     // Extract integer part (before any remaining decimal point)
     final parts = cleaned.split('.');
     final result = parts.first;
-    _logger.fine('_cleanupAmount final result: "$result"');
+    _logger.fine('cleanupAmount final result: "$result"');
     return result;
   }
 
@@ -542,64 +512,36 @@ class AIService {
       };
 
       const invoicePrompt =
-          'Extract ALL line items from this Vietnamese invoice image exactly as shown.\n'
+          'Extract line items from this Vietnamese invoice table.\n'
+          'Return ONLY the items list, no markdown, no explanation.\n'
+          'Format EACH item: ITEM: [product name] | AMOUNT: [number] | CATEGORY: [category]\n'
           '\n'
-          'CRITICAL - READ THIS CAREFULLY:\n'
-          '**For each item, return EXACTLY ONE AMOUNT - the rightmost/final amount only**\n'
+          'CRITICAL RULES:\n'
+          '1. Read ONLY the rightmost numeric column (final total column - "Thành Tiền Sau Thuế")\n'
+          '2. Match EACH item name with the amount on the SAME ROW - this is critical!\n'
+          '3. Convert format: "27.500,00" → 27500 (remove separators, drop decimals)\n'
+          '4. SKIP: Header rows, summary/total/subtotal rows, tax rows\n'
+          '5. Item names should be product names (not column headers or totals)\n'
+          '6. Do NOT confuse amounts between different rows\n'
           '\n'
-          'STEP-BY-STEP INSTRUCTIONS:\n'
-          '1. Item Name: Read from the LEFTMOST product description column\n'
+          'Categories (text only, NO EMOJIS): Housing, Food, Transportation, Utilities, Healthcare, Entertainment, Shopping, Other\n'
           '\n'
-          '2. Amount (MOST IMPORTANT - READ CAREFULLY):\n'
-          '   - Find the ROW for that item\n'
-          '   - Look at the RIGHTMOST COLUMN in that row (usually "Thành Tiền Sau Thuế")\n'
-          '   - That rightmost number is THE ONLY amount you should use\n'
-          '   - ABSOLUTELY DO NOT read from "Đơn Giá" (unit price) or middle columns\n'
-          '   - ABSOLUTELY DO NOT concatenate or combine multiple numbers from the same row\n'
-          '   - Extract just ONE final amount per item\n'
-          '\n'
-          '3. Vietnamese number format:\n'
-          '   - Format: "[thousands].[thousands],[decimal]" → e.g., "49.800,00"\n'
-          '   - Convert to integer: Remove dots and commas, keep only digits → "49800"\n'
-          '   - Examples:\n'
-          '     * "51.500,00" → 51500\n'
-          '     * "49.800,00" → 49800\n'
-          '     * "67.500" → 67500\n'
-          '\n'
-          '4. Output format (ONE line per item):\n'
-          '   ITEM: [product name] | AMOUNT: [single final amount as digits only] | CATEGORY: [category]\n'
-          '\n'
-          'VALIDATION RULES:\n'
-          '   - Amount must be a reasonable price (typically 1000+ in VND)\n'
-          '   - DO NOT output multiple amounts per item\n'
-          '   - DO NOT include totals or subtotals\n'
-          '   - DO NOT include tax rows\n'
-          '\n'
-          'EXAMPLES (notice ONE amount per item):\n'
-          'ITEM: Mì Hảo Hảo Big tôm chua cay 100g Gói | AMOUNT: 51500 | CATEGORY: Food\n'
-          'ITEM: Sữa chua uống men sống Probi dâu lốc 5 x 65 ml | AMOUNT: 49800 | CATEGORY: Food';
+          'Example output:\n'
+          'ITEM: Nước rửa chén Sunlight chanh 750g | AMOUNT: 27500 | CATEGORY: Shopping\n'
+          'ITEM: Sữa chua uống men sống Probi dâu | AMOUNT: 124500 | CATEGORY: Food';
 
       final body = jsonEncode({
         'messages': [
           {
             'role': 'system',
-            'content': 'You are a strict financial invoice extraction assistant specialized in Vietnamese invoices. '
-                '\n'
-                'PRIMARY RULE: Extract EXACTLY ONE amount per item line - always from the RIGHTMOST/FINAL column.\n'
-                '\n'
-                'NEVER:\n'
-                '- Read from intermediate price columns\n'
-                '- Concatenate multiple amounts\n'
-                '- Extract unit prices\n'
-                '- Include totals or tax rows\n'
-                '\n'
-                'ALWAYS:\n'
-                '- Use the rightmost amount in each row\n'
-                '- Return format: ITEM: [name] | AMOUNT: [one amount only] | CATEGORY: [type]\n'
-                '- Convert Vietnamese: 49.800,00 → 49800 (single integer)\n'
-                '- Verify amount is reasonable (1000+ VND)\n'
-                '\n'
-                'Categories: 🏠 Housing, 🍚 Food, 🚗 Transportation, 💡 Utilities, 🏥 Healthcare, 🎭 Entertainment, 🛍️ Shopping, Other.'
+            'content': 'You are a precise invoice data extraction specialist. '
+                'Extract items in this EXACT format: ITEM: [name] | AMOUNT: [number] | CATEGORY: [category] '
+                'READ CAREFULLY: Match item descriptions with amounts from the SAME ROW ONLY. '
+                'CRITICAL: Always read from the rightmost final-amount column ("Thành Tiền Sau Thuế"). '
+                'Do NOT mix up amounts between different rows - each item gets ONE correct amount. '
+                'Convert Vietnamese numbers (27.500,00) to plain integers (27500). '
+                'Use ONLY text category names (Food, Housing, etc) - NO EMOJI symbols. '
+                'Output ONLY the item lines, no JSON, no markdown, no explanations.',
           },
           {
             'role': 'user',
@@ -617,13 +559,10 @@ class AIService {
             ],
           }
         ],
-        'temperature': 0.5,
-        'max_tokens': 500,
+        'temperature': 0.3,
+        'max_tokens': 2000,
         'model': AIConfig.model,
       });
-
-      _logger.info('Sending request to ${AIConfig.getApiUrl()}');
-      _logger.fine('Request body size: ${body.length} bytes');
 
       final response = await http
           .post(
@@ -632,10 +571,6 @@ class AIService {
             body: body,
           )
           .timeout(const Duration(seconds: 60));
-
-      _logger.info('Received response with status: ${response.statusCode}');
-      _logger.fine('Response headers: ${response.headers}');
-      _logger.fine('Response body length: ${response.body.length} characters');
 
       if (response.statusCode == 200) {
         try {
@@ -667,6 +602,7 @@ class AIService {
           }
 
           final data = jsonDecode(response.body);
+          _logger.info('data imported from API 123555: \n $data');
           _logger.fine('Successfully decoded JSON response');
 
           // Validate response structure

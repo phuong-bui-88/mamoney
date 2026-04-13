@@ -364,8 +364,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         }
 
         // Parse amount for database storage
-        final cleanAmount = amount.trim().replaceAll(RegExp(r'[^\d.]'), '');
-        var parsedAmount = double.tryParse(cleanAmount) ?? 0;
+        // Use AIService.cleanupAmount to properly handle various number formats
+        // (Vietnamese: 27.500,00 → 27500, US: 27,500.00 → 27500, etc.)
+        final cleanedAmount = AIService.cleanupAmount(amount.trim());
+        var parsedAmount = double.tryParse(cleanedAmount) ?? 0;
 
         // Validate amount is reasonable (not 0 or too small)
         if (parsedAmount <= 0) {
@@ -606,7 +608,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
         if (description.isNotEmpty && amount.isNotEmpty) {
           // Parse amount for database storage
-          final cleanAmount = amount.replaceAll(',', '');
+          // Use AIService.cleanupAmount to properly handle various number formats
+          final cleanAmount = AIService.cleanupAmount(amount.trim());
           var parsedAmount = double.tryParse(cleanAmount) ?? 0;
 
           // Ensure user is signed in
@@ -1373,7 +1376,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   Widget _buildTransactionCard() {
     final amountStr = _amountController.text.trim();
-    final cleanAmountStr = amountStr.replaceAll(',', '');
+    final cleanAmountStr = AIService.cleanupAmount(amountStr);
     final amount = double.tryParse(cleanAmountStr) ?? 0;
 
     // Select emoji from category (extract emoji before space)

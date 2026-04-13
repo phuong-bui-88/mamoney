@@ -74,8 +74,6 @@ class TransactionEmbeddings {
     String userQuestion,
     List<Transaction> allTransactions,
   ) async {
-    print("all Transactions context for AI:\n$allTransactions");
-
     try {
       if (allTransactions.isEmpty) {
         return 'User has no transactions recorded.';
@@ -83,7 +81,6 @@ class TransactionEmbeddings {
 
       // Parse question to extract month, year, and type
       final queryInfo = _parseUserQuestion(userQuestion);
-      print("Parsed query info: $queryInfo");
 
       List<Transaction> relevantTransactions = allTransactions.toList();
 

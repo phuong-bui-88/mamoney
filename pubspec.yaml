@@ -30,6 +30,7 @@ dependencies:
   
   # Image & Camera
   image_picker: ^1.0.0
+  google_mlkit_text_recognition: ^0.15.1
   
   # Speech to text
   speech_to_text: ^6.1.1

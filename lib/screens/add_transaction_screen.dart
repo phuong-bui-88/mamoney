@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/models/transaction.dart';
@@ -7,62 +6,19 @@ import 'package:mamoney/services/transaction_provider.dart';
 import 'package:mamoney/services/firebase_service.dart';
 import 'package:mamoney/services/ai_service.dart';
 import 'package:intl/intl.dart';
-import 'package:mamoney/utils/currency_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mamoney/widgets/invoice_import_loading_overlay.dart';
 import 'package:mamoney/widgets/image_source_picker_dialog.dart';
 import 'package:mamoney/screens/invoice_preview_screen.dart';
 import 'package:mamoney/utils/category_constants.dart';
 import 'package:logging/logging.dart';
+import 'package:mamoney/widgets/chat_bubble_widget.dart';
+import 'package:mamoney/widgets/transaction_card_widget.dart';
+import 'package:mamoney/widgets/invoice_widgets.dart';
+import 'package:mamoney/widgets/invoice_image_widget.dart';
+import 'package:mamoney/widgets/input_section_widget.dart';
 
 final _logger = Logger('AddTransactionScreen');
-
-enum ChatMessageType { user, assistant }
-
-class ChatMessage {
-  final ChatMessageType type;
-  final String text;
-
-  ChatMessage({required this.type, required this.text});
-}
-
-class TransactionRecord {
-  final String description;
-  final double amount;
-  final String category;
-  final DateTime date;
-  final TransactionType type;
-  final String userMessage;
-  final String? imageUrl; // Add image URL field
-  final String? invoiceId; // Track invoice grouping
-
-  TransactionRecord({
-    required this.description,
-    required this.amount,
-    required this.category,
-    required this.date,
-    required this.type,
-    required this.userMessage,
-    this.imageUrl,
-    this.invoiceId,
-  });
-}
-
-/// Local representation of a group of transactions from the same invoice
-/// Used for display in the chat UI during invoice import
-class InvoiceGroup {
-  final String invoiceId;
-  final DateTime invoiceDate;
-  final List<TransactionRecord> transactions;
-
-  InvoiceGroup({
-    required this.invoiceId,
-    required this.invoiceDate,
-    required this.transactions,
-  });
-
-  double get totalAmount => transactions.fold(0, (sum, tx) => sum + tx.amount);
-}
 
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
@@ -721,793 +677,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
-  Widget _buildChatBubble(ChatMessage message) {
-    final isUser = message.type == ChatMessageType.user;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          if (!isUser)
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey[200],
-              ),
-              child: const Center(
-                child: Text('🤖', style: TextStyle(fontSize: 16)),
-              ),
-            ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isUser ? const Color(0xFFE0E7FF) : Colors.grey[100],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                message.text,
-                style: TextStyle(
-                  color: Colors.grey[900],
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-              ),
-            ),
-          ),
-          if (isUser) const SizedBox(width: 8),
-          if (isUser)
-            Container(
-              width: 28,
-              height: 28,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF6B5B95),
-              ),
-              child: const Center(
-                child: Text('👤', style: TextStyle(fontSize: 16)),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// Build a grouped invoice preview card showing all parsed items
-  Widget _buildInvoiceGroupPreview() {
-    if (_parsedInvoiceItems.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    double totalAmount = 0;
-    for (final item in _parsedInvoiceItems) {
-      final amount = double.tryParse(item['amount']?.toString() ?? '0') ?? 0;
-      totalAmount += amount;
-    }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE3F2FD), // Light blue background
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF90CAF9), width: 1),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '📋 Invoice Items',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Color(0xFF1976D2),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Invoice ID: ${_currentInvoiceId ?? "N/A"}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  '${_parsedInvoiceItems.length} items',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Color(0xFF1976D2),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-
-            // Items list
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _parsedInvoiceItems.length,
-              itemBuilder: (context, index) {
-                final item = _parsedInvoiceItems[index];
-                final description = item['description'] ?? 'Unknown';
-                final amount = item['amount'] ?? '0';
-                final category = item['category'] ?? 'Other';
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              description,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              category,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade100,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '- $amount',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-
-            // Total
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total Amount',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Color(0xFF1976D2),
-                  ),
-                ),
-                Text(
-                  formatCurrency(totalAmount),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.red,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build a completed invoice group card showing all transactions grouped by invoice
-  Widget _buildCompletedInvoiceGroup(InvoiceGroup group) {
-    final dateFormat = DateFormat('MMM dd, yyyy');
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE3F2FD), // Light blue background
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF90CAF9), width: 1),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with icon, title, and details
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '📋 Invoice',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Color(0xFF1976D2),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        dateFormat.format(group.invoiceDate),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${group.transactions.length} items',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Color(0xFF1976D2),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '• ${formatCurrency(group.totalAmount)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-
-            // Items list
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: group.transactions.length,
-              itemBuilder: (context, index) {
-                final tx = group.transactions[index];
-                final emoji = tx.category.isNotEmpty
-                    ? (tx.category.indexOf(' ') > 0
-                        ? tx.category.substring(0, tx.category.indexOf(' '))
-                        : '📦')
-                    : '📦';
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  emoji,
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    tx.description,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              tx.category,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade100,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '- ${formatCurrency(tx.amount)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-
-            // Total
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total Amount',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Color(0xFF1976D2),
-                  ),
-                ),
-                Text(
-                  formatCurrency(group.totalAmount),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.red,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompletedTransactionCard(TransactionRecord record) {
-    // Select emoji from category (extract emoji before space)
-    String getEmoji() {
-      if (record.category.isNotEmpty) {
-        // Category format: "🍚 Food", extract part before space
-        final spaceIndex = record.category.indexOf(' ');
-        if (spaceIndex > 0) {
-          return record.category.substring(0, spaceIndex).trim();
-        }
-      }
-      // Fallback to default
-      if (record.type == TransactionType.expense) return '🛒';
-      return '💰';
-    }
-
-    final formatted = formatCurrency(record.amount);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Container(
-        margin: EdgeInsets.zero,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey[200] ?? Colors.grey),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Recorded: ${record.type == TransactionType.expense ? 'Expense' : 'Income'}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  DateFormat('EEE, MMM dd').format(record.date),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Content
-            Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFB3E5FC),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      getEmoji(),
-                      style: const TextStyle(fontSize: 32),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        record.description,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  formatted,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: record.type == TransactionType.expense
-                        ? Colors.red
-                        : Colors.green,
-                  ),
-                ),
-              ],
-            ),
-            // Invoice Image Thumbnail (if exists)
-            if (record.imageUrl != null && record.imageUrl!.isNotEmpty)
-              _buildInvoiceImageWidget(record.imageUrl!),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInvoiceImageWidget(String imageUrl) {
-    // Handle both local and network images
-    if (imageUrl.startsWith('local://')) {
-      // Local image - fetch from SharedPreferences
-      return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: GestureDetector(
-          onTap: () => _showImagePreview(imageUrl),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: FutureBuilder<Uint8List?>(
-              future: FirebaseService().getLocalImage(imageUrl),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Container(
-                    height: 120,
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  );
-                }
-
-                if (snapshot.hasError || snapshot.data == null) {
-                  return Container(
-                    height: 120,
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child:
-                          Icon(Icons.image_not_supported, color: Colors.grey),
-                    ),
-                  );
-                }
-
-                return Stack(
-                  children: [
-                    Image.memory(
-                      snapshot.data!,
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.zoom_in,
-                            color: Colors.white,
-                            size: 32,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      );
-    } else {
-      // Network image - use Image.network
-      return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: GestureDetector(
-          onTap: () => _showImagePreview(imageUrl),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Stack(
-              children: [
-                Image.network(
-                  imageUrl,
-                  height: 120,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 120,
-                      color: Colors.grey[200],
-                      child: const Center(
-                        child:
-                            Icon(Icons.image_not_supported, color: Colors.grey),
-                      ),
-                    );
-                  },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      height: 120,
-                      color: Colors.grey[200],
-                      child: const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.zoom_in,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
-  void _showImagePreview(String imageUrl) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            color: Colors.black.withValues(alpha: 0.9),
-            child: Center(
-              child: imageUrl.startsWith('local://')
-                  ? FutureBuilder<Uint8List?>(
-                      future: FirebaseService().getLocalImage(imageUrl),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData) {
-                          return InteractiveViewer(
-                            child: Image.memory(snapshot.data!),
-                          );
-                        }
-                        return const SizedBox(
-                          width: 50,
-                          height: 50,
-                          child: CircularProgressIndicator(),
-                        );
-                      },
-                    )
-                  : InteractiveViewer(
-                      child: Image.network(imageUrl),
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTransactionCard() {
-    final amountStr = _amountController.text.trim();
-    final cleanAmountStr = AIService.cleanupAmount(amountStr);
-    final amount = double.tryParse(cleanAmountStr) ?? 0;
-
-    // Select emoji from category (extract emoji before space)
-    String getEmoji() {
-      if (_selectedCategory.isNotEmpty) {
-        // Category format: "🍚 Food", extract part before space
-        final spaceIndex = _selectedCategory.indexOf(' ');
-        if (spaceIndex > 0) {
-          return _selectedCategory.substring(0, spaceIndex).trim();
-        }
-      }
-      // Fallback to default
-      if (_selectedType == TransactionType.expense) return '🛒';
-      return '💰';
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Container(
-        margin: EdgeInsets.zero,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.grey[200] ?? Colors.grey),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Recorded: ${_selectedType == TransactionType.expense ? 'Expense' : 'Income'}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  DateFormat('EEE, MMM dd').format(_selectedDate),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Content
-            Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFB3E5FC),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      getEmoji(),
-                      style: const TextStyle(fontSize: 32),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _descriptionController.text.isNotEmpty
-                            ? _descriptionController.text
-                            : 'No description',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _selectedCategory,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  formatCurrency(amount),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: _selectedType == TransactionType.expense
-                        ? Colors.red
-                        : Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  @override
   @override
   Widget build(BuildContext context) {
     final categories = _selectedType == TransactionType.income
@@ -1540,7 +710,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 children: [
                   // Show invoice group preview at top (if items are parsed)
                   if (_parsedInvoiceItems.isNotEmpty)
-                    _buildInvoiceGroupPreview(),
+                    InvoiceGroupPreviewCard(
+                      items: _parsedInvoiceItems,
+                      invoiceId: _currentInvoiceId,
+                    ),
 
                   // Chat Messages Area with Completed Transactions
                   Expanded(
@@ -1553,7 +726,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       itemBuilder: (context, index) {
                         // All chat messages
                         if (index < _chatMessages.length) {
-                          return _buildChatBubble(_chatMessages[index]);
+                          return ChatBubbleWidget(
+                            message: _chatMessages[index],
+                          );
                         }
 
                         // All completed transactions and invoice groups
@@ -1562,7 +737,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
                         // Display invoice groups (multiple transactions grouped together)
                         if (item is InvoiceGroup) {
-                          return _buildCompletedInvoiceGroup(item);
+                          return CompletedInvoiceGroupCard(group: item);
                         }
 
                         // Display individual transactions (with user message + card)
@@ -1571,13 +746,27 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Column(
                               children: [
-                                _buildChatBubble(
-                                  ChatMessage(
+                                ChatBubbleWidget(
+                                  message: ChatMessage(
                                     type: ChatMessageType.user,
                                     text: item.userMessage,
                                   ),
                                 ),
-                                _buildCompletedTransactionCard(item),
+                                CompletedTransactionCard(record: item),
+                                if (item.imageUrl != null &&
+                                    item.imageUrl!.isNotEmpty)
+                                  InvoiceImageWidget(
+                                    imageUrl: item.imageUrl!,
+                                    onTap: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) =>
+                                            ImagePreviewDialog(
+                                          imageUrl: item.imageUrl!,
+                                        ),
+                                      );
+                                    },
+                                  ),
                               ],
                             ),
                           );
@@ -1596,15 +785,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                             horizontal: 16, vertical: 12),
                         child: Column(
                           children: [
-                            _buildChatBubble(
-                              ChatMessage(
+                            ChatBubbleWidget(
+                              message: ChatMessage(
                                 type: ChatMessageType.user,
                                 text: _aiMessageController.text.isNotEmpty
                                     ? _aiMessageController.text
                                     : '',
                               ),
                             ),
-                            _buildTransactionCard(),
+                            TransactionPreviewCard(
+                              description: _descriptionController.text,
+                              category: _selectedCategory,
+                              amount: double.tryParse(AIService.cleanupAmount(
+                                      _amountController.text.trim())) ??
+                                  0,
+                              type: _selectedType,
+                              date: _selectedDate,
+                            ),
                           ],
                         ),
                       ),
@@ -1631,228 +828,34 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                         ),
                       ),
                     ),
-                  // Input Area
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border(
-                        top: BorderSide(color: Colors.grey[200] ?? Colors.grey),
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Quick entry input
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color:
-                                      Colors.grey[100] ?? Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: Colors.grey[300] ??
-                                        Colors.grey.shade300,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: TextField(
-                                  controller: _aiMessageController,
-                                  decoration: InputDecoration(
-                                    hintText: 'e.g., "va xe 30k"',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey[400],
-                                      fontSize: 14,
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                  maxLines: 1,
-                                  enabled:
-                                      !_isParsingAI && !provider.isImporting,
-                                  onSubmitted:
-                                      _isParsingAI || provider.isImporting
-                                          ? null
-                                          : (_) {
-                                              _parseAIMessage();
-                                            },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Camera button for invoice
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.blue,
-                              ),
-                              child: IconButton(
-                                onPressed: _isProcessingImage ||
-                                        _isSavingTransaction ||
-                                        provider.isImporting
-                                    ? null
-                                    : () {
-                                        ImageSourcePickerDialog.show(
-                                          context,
-                                          onImageSourceSelected:
-                                              _captureAndParseInvoice,
-                                        );
-                                      },
-                                icon: const Icon(
-                                  Icons.camera_alt,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Send button for text input
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.black,
-                              ),
-                              child: IconButton(
-                                onPressed: _isParsingAI || provider.isImporting
-                                    ? null
-                                    : () {
-                                        _parseAIMessage();
-                                      },
-                                icon: const Icon(
-                                  Icons.send,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // Transaction Type Selector
-                        Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedType = TransactionType.income;
-                                    _selectedCategory = CategoryConstants
-                                        .incomeCategories.first;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                    horizontal: 16,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        _selectedType == TransactionType.income
-                                            ? Colors.green
-                                            : Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(12),
-                                    border:
-                                        _selectedType == TransactionType.income
-                                            ? Border.all(
-                                                color: Colors.green.shade700,
-                                                width: 2)
-                                            : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.arrow_downward,
-                                        color: _selectedType ==
-                                                TransactionType.income
-                                            ? Colors.white
-                                            : Colors.grey,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Income',
-                                        style: TextStyle(
-                                          color: _selectedType ==
-                                                  TransactionType.income
-                                              ? Colors.white
-                                              : Colors.grey,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedType = TransactionType.expense;
-                                    _selectedCategory = CategoryConstants
-                                        .expenseCategories.first;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                    horizontal: 16,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        _selectedType == TransactionType.expense
-                                            ? Colors.red
-                                            : Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(12),
-                                    border:
-                                        _selectedType == TransactionType.expense
-                                            ? Border.all(
-                                                color: Colors.red.shade700,
-                                                width: 2)
-                                            : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.arrow_upward,
-                                        color: _selectedType ==
-                                                TransactionType.expense
-                                            ? Colors.white
-                                            : Colors.grey,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Expense',
-                                        style: TextStyle(
-                                          color: _selectedType ==
-                                                  TransactionType.expense
-                                              ? Colors.white
-                                              : Colors.grey,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                  // Input Section
+                  InputSectionWidget(
+                    messageController: _aiMessageController,
+                    selectedType: _selectedType,
+                    onTypeChanged: (type) {
+                      setState(() {
+                        _selectedType = type;
+                        _selectedCategory = type == TransactionType.income
+                            ? CategoryConstants.incomeCategories.first
+                            : CategoryConstants.expenseCategories.first;
+                      });
+                    },
+                    onCameraPressed: _isProcessingImage ||
+                            _isSavingTransaction ||
+                            provider.isImporting
+                        ? null
+                        : () {
+                            ImageSourcePickerDialog.show(
+                              context,
+                              onImageSourceSelected: _captureAndParseInvoice,
+                            );
+                          },
+                    onSendPressed: _isParsingAI || provider.isImporting
+                        ? null
+                        : _parseAIMessage,
+                    isProcessingImage: _isProcessingImage,
+                    isSavingTransaction: _isSavingTransaction,
+                    isImporting: provider.isImporting,
                   ),
                 ],
               ),

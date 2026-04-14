@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/models/transaction.dart';
+import 'package:mamoney/models/invoice_preview_state.dart';
 import 'package:mamoney/services/transaction_provider.dart';
 import 'package:mamoney/services/firebase_service.dart';
 import 'package:mamoney/services/ai_service.dart';
@@ -10,6 +11,7 @@ import 'package:mamoney/utils/currency_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mamoney/widgets/invoice_import_loading_overlay.dart';
 import 'package:mamoney/widgets/image_source_picker_dialog.dart';
+import 'package:mamoney/screens/invoice_preview_screen.dart';
 import 'package:mamoney/utils/category_constants.dart';
 import 'package:logging/logging.dart';
 
@@ -272,7 +274,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (!mounted) return;
 
       // Extract results
-      final items = parseResult['items'] as List<Map<String, String>>? ?? [];
+      final items = parseResult['items'] as List<Map<String, dynamic>>? ?? [];
       final invoiceId = parseResult['invoiceId'] as String?;
       final invoiceDate = parseResult['invoiceDate'] as DateTime?;
 
@@ -343,9 +345,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       // Transition to saving step
       provider.setImportStep(InvoiceImportStep.saving);
 
-      // Process and save all items
-      int successCount = 0;
-      double totalAmount = 0;
+      // Process all items and create Transaction objects
+      // These will NOT be saved immediately - user will review first
+      final List<Transaction> transactionsForPreview = [];
 
       for (final item in items) {
         final description = item['description'] ?? '';
@@ -391,7 +393,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           validCategory = partialMatch;
         }
 
-        // Create transaction object for database with invoice image URL
+        // Create transaction object (without saving yet)
         // Try to get ragId from AI parsing
         String? ragId;
         try {
@@ -407,7 +409,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         }
 
         final transaction = Transaction(
-          id: '',
+          id: '', // Will be generated on save
           userId: uid,
           description: description,
           amount: parsedAmount,
@@ -422,50 +424,67 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           ragId: ragId,
         );
 
-        // Save to database
-        try {
-          final savedId = await provider.addTransaction(transaction);
-          _logger.info('Invoice item saved with ID: $savedId');
-          successCount++;
-          totalAmount += parsedAmount;
-        } catch (e) {
-          _addChatMessage(
-            '❌ Failed to save: $description - $e',
-            ChatMessageType.assistant,
-          );
-        }
+        transactionsForPreview.add(transaction);
       }
 
-      if (successCount == 0) {
+      if (transactionsForPreview.isEmpty) {
         _addChatMessage(
-          '⚠️ Could not save any items from the invoice. Please try again.',
+          'Could not extract any valid items from invoice. Please try another image.',
           ChatMessageType.assistant,
         );
         setState(() {
           _isProcessingImage = false;
         });
+        provider.clearImportStep();
         return;
       }
 
+      // Transition to preview step
+      provider.setImportStep(InvoiceImportStep.none);
+
+      // Create preview state
+      final previewState = InvoicePreviewState(
+        invoiceId:
+            invoiceId ?? 'invoice_${DateTime.now().millisecondsSinceEpoch}',
+        invoiceDate: invoiceDate ?? DateTime.now(),
+        imageUrl: invoiceImageUrl ?? '',
+        transactions: transactionsForPreview,
+        originalTransactions: transactionsForPreview,
+      );
+
+      // Set preview state in provider
+      provider.setInvoicePreview(previewState);
+
+      if (!mounted) return;
+
       _addChatMessage(
-        '✅ Invoice saved: $successCount items - Total ${formatCurrency(totalAmount)}',
+        '✅ Found ${transactionsForPreview.length} items. Please review before saving.',
         ChatMessageType.assistant,
       );
 
-      // Show grouped preview for 2 seconds before clearing
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Clear parsed invoice items and reset form
-      setState(() {
-        _parsedInvoiceItems = [];
-        _currentInvoiceId = null;
-      });
-
-      // Refresh transactions from Firebase
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Navigate to preview screen
       if (mounted) {
-        _loadOldTransactions();
-        _scrollToBottom();
+        final result = await Navigator.of(context).push<bool?>(
+          MaterialPageRoute(
+            builder: (context) => InvoicePreviewScreen(
+              initialPreviewState: previewState,
+            ),
+          ),
+        );
+
+        // Check if preview was successfully saved
+        if (result == true) {
+          // Preview screen handled the save, refresh the UI
+          if (mounted) {
+            _addChatMessage(
+              '✅ Invoice saved successfully!',
+              ChatMessageType.assistant,
+            );
+            await Future.delayed(const Duration(milliseconds: 500));
+            _loadOldTransactions();
+            _scrollToBottom();
+          }
+        }
       }
     } catch (e) {
       if (mounted) {

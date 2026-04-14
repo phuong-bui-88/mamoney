@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/models/invoice_group.dart';
+import 'package:mamoney/models/invoice_preview_state.dart';
 import 'package:mamoney/services/firebase_service.dart';
 import 'package:mamoney/widgets/invoice_import_loading_overlay.dart';
 import 'package:logging/logging.dart';
@@ -28,6 +29,9 @@ class TransactionProvider extends ChangeNotifier {
   // Invoice grouping state - tracks which invoice groups are expanded
   final Map<String, bool> _expandedInvoices = {};
 
+  // Invoice preview state - holds transactions during preview/edit phase
+  InvoicePreviewState? _previewState;
+
   List<Transaction> get transactions => _transactions;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -52,6 +56,10 @@ class TransactionProvider extends ChangeNotifier {
     }).toList();
     return filtered;
   }
+
+  // Preview state getter
+  InvoicePreviewState? get previewState => _previewState;
+  bool get hasPreview => _previewState != null;
 
   double get totalIncome => _transactions
       .where((t) => t.type == TransactionType.income)
@@ -146,7 +154,6 @@ class TransactionProvider extends ChangeNotifier {
       for (final transaction in transactionsToDelete) {
         await _firebaseService.deleteTransaction(transaction.id);
       }
-
     } catch (e) {
       _error = e.toString();
       rethrow;
@@ -268,7 +275,7 @@ class TransactionProvider extends ChangeNotifier {
     // Create InvoiceGroup objects and sort by invoiceDate (newest first)
     final groups = invoiceGroups.entries.map((entry) {
       final transaction = entry.value.first;
-    
+
       return InvoiceGroup(
         invoiceId: entry.key,
         imageUrl: transaction.imageUrl,
@@ -322,6 +329,79 @@ class TransactionProvider extends ChangeNotifier {
   /// Check if an invoice group is expanded
   bool isInvoiceExpanded(String invoiceId) {
     return _expandedInvoices[invoiceId] ?? true;
+  }
+
+  // ============ Invoice Preview State Management ============
+
+  /// Set the invoice preview state when starting review
+  void setInvoicePreview(InvoicePreviewState state) {
+    _previewState = state;
+    notifyListeners();
+  }
+
+  /// Update a single transaction in the preview
+  void updatePreviewTransaction(int index, Transaction updatedTransaction) {
+    if (_previewState == null) return;
+    _previewState = _previewState!.updateTransaction(index, updatedTransaction);
+    notifyListeners();
+  }
+
+  /// Remove a transaction from the preview
+  void removeFromPreview(int index) {
+    if (_previewState == null) return;
+    _previewState = _previewState!.removeTransaction(index);
+    notifyListeners();
+  }
+
+  /// Add a new transaction to the preview
+  void addToPreview(Transaction transaction) {
+    if (_previewState == null) return;
+    _previewState = _previewState!.addTransaction(transaction);
+    notifyListeners();
+  }
+
+  /// Save all transactions from preview to Firebase and clear preview state
+  Future<void> savePreviewTransactions() async {
+    if (_previewState == null || _previewState!.transactions.isEmpty) {
+      throw Exception('No transactions to save in preview');
+    }
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _logger.info(
+        '[PREVIEW] Saving ${_previewState!.transactions.length} transactions '
+        'from invoice ${_previewState!.invoiceId}',
+      );
+
+      // Save all transactions from preview
+      final transactions = _previewState!.transactions;
+      for (final transaction in transactions) {
+        await _firebaseService.addTransaction(transaction);
+      }
+
+      _logger.info(
+        '[PREVIEW] Successfully saved ${transactions.length} transactions',
+      );
+
+      // Clear preview state after successful save
+      _previewState = null;
+    } catch (e) {
+      _error = e.toString();
+      _logger.severe('[PREVIEW] Error saving transactions: $e');
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Clear the invoice preview state without saving
+  void clearPreview() {
+    _previewState = null;
+    notifyListeners();
   }
 
   @override

@@ -1,10 +1,8 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
 import 'dart:async';
-import 'dart:typed_data';
-import 'dart:math' show min;
 import 'package:flutter/foundation.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:mamoney/services/ai_config.dart';
 import 'package:logging/logging.dart';
 import 'package:uuid/uuid.dart';
@@ -196,63 +194,7 @@ class AIService {
     return match?.group(0) ?? '';
   }
 
-  /// Extract text from invoice image using OCR (Google ML Kit)
-  /// Handles mobile (imagePath) - web has limitations with on-device OCR
-  /// Returns extracted text or error message
-  static Future<String> _extractTextFromImage(
-    String? imagePath, {
-    Uint8List? imageBytes,
-  }) async {
-    try {
-      // For web, image bytes can't be directly processed by on-device ML Kit
-      // We would need to use cloud-based OCR (not implemented)
-      if (kIsWeb && imageBytes != null && imagePath == null) {
-        const errorMsg =
-            'OCR on web platform requires cloud-based processing (not currently configured). Please use mobile app for invoice parsing.';
-        _logger.warning(errorMsg);
-        return errorMsg;
-      }
-
-      if (imagePath == null || imagePath.isEmpty) {
-        const errorMsg =
-            'Failed to extract text: Image path not provided. OCR only works on mobile platforms.';
-        _logger.warning(errorMsg);
-        return errorMsg;
-      }
-
-      _logger.info('OCR: Processing image file: $imagePath');
-
-      // Create input image from file
-      final inputImage = InputImage.fromFilePath(imagePath);
-
-      // Create text recognizer and extract text
-      final textRecognizer = TextRecognizer();
-      _logger.info('OCR: Starting text recognition...');
-
-      final RecognizedText recognizedText =
-          await textRecognizer.processImage(inputImage);
-
-      // Combine all extracted text blocks
-      final extractedText = recognizedText.text;
-      _logger.info(
-          'OCR: Successfully extracted ${extractedText.length} characters');
-
-      if (extractedText.isNotEmpty) {
-        _logger.fine(
-            'Extracted text preview:\n${extractedText.substring(0, min(200, extractedText.length))}...');
-      }
-
-      await textRecognizer.close();
-
-      return extractedText.isNotEmpty
-          ? extractedText
-          : 'OCR: No text found in image. Is this a valid invoice?';
-    } catch (e, stackTrace) {
-      final errorMsg = 'OCR extraction failed: $e';
-      _logger.severe(errorMsg, e, stackTrace);
-      return errorMsg;
-    }
-  }
+  /// Parse invoice image to extract transaction details and generate invoiceId
   /// Accepts either imageBytes directly (for web) or imagePath (for mobile)
   /// Returns a map with:
   ///   - 'items': List of extracted items, each with {description, amount, category, type}
@@ -283,30 +225,83 @@ class AIService {
       };
     }
 
-    // Step 1: Extract text from image using OCR
-    _logger.info('Step 1: Extracting text from invoice image using OCR...');
-    final extractedText = await _extractTextFromImage(
-      imagePath,
-      imageBytes: imageBytes,
-    );
+    // Read image bytes
+    late Uint8List imageData;
+    late String detectedMediaType;
 
-    // Check if OCR extraction failed
-    if (extractedText.startsWith('OCR') || extractedText.startsWith('Failed')) {
-      _logger.warning('OCR extraction failed: $extractedText');
+    try {
+      if (imageBytes != null) {
+        // Web: bytes passed directly
+        if (imageBytes.isEmpty) {
+          return {
+            'items': [
+              {'error': 'Image data is empty'}
+            ],
+            'invoiceId': invoiceId,
+            'invoiceDate': invoiceDate,
+          };
+        }
+        imageData = imageBytes;
+        detectedMediaType = mediaType ?? 'image/jpeg';
+      } else if (imagePath != null && !kIsWeb) {
+        // Mobile: read from file path
+        final imageFile = File(imagePath);
+
+        if (!imageFile.existsSync()) {
+          return {
+            'items': [
+              {'error': 'Image file not found: $imagePath'}
+            ],
+            'invoiceId': invoiceId,
+            'invoiceDate': invoiceDate,
+          };
+        }
+
+        imageData = imageFile.readAsBytesSync();
+
+        if (imageData.isEmpty) {
+          return {
+            'items': [
+              {'error': 'Image file is empty: $imagePath'}
+            ],
+            'invoiceId': invoiceId,
+            'invoiceDate': invoiceDate,
+          };
+        }
+
+        // Determine image media type from file extension
+        final extension = imagePath.split('.').last.toLowerCase();
+        detectedMediaType = _getMediaType(extension);
+      } else {
+        return {
+          'items': [
+            {
+              'error':
+                  'No image data provided. Please provide either imagePath or imageBytes.'
+            }
+          ],
+          'invoiceId': invoiceId,
+          'invoiceDate': invoiceDate,
+        };
+      }
+    } catch (e, stackTrace) {
+      _logger.severe('Error reading image: $e', e, stackTrace);
       return {
         'items': [
-          {'error': 'Failed to extract text from invoice: $extractedText'}
+          {'error': 'Failed to read image: $e'}
         ],
         'invoiceId': invoiceId,
         'invoiceDate': invoiceDate,
       };
     }
 
-    _logger.info(
-        'Step 2: Sending extracted text to AI for parsing (${extractedText.length} characters)...');
+    final base64Image = base64.encode(imageData);
 
-    // Step 2: Call GitHub Models API with extracted text (not image)
-    final response = await _callGitHubModelsWithText(extractedText);
+    // Call GitHub Models API with base64-encoded image
+    final response = await _callGitHubModelsWithImage(
+      base64Image,
+      detectedMediaType,
+    );
 
     if (response['success']) {
       final items = _extractInvoiceLineItems(response['message']);
@@ -324,6 +319,23 @@ class AIService {
         'invoiceId': invoiceId,
         'invoiceDate': invoiceDate,
       };
+    }
+  }
+
+  /// Get media type from file extension
+  static String _getMediaType(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'image/jpeg';
     }
   }
 
@@ -488,9 +500,10 @@ class AIService {
     return result;
   }
 
-  /// Call GitHub Models API with extracted text from OCR
-  static Future<Map<String, dynamic>> _callGitHubModelsWithText(
-    String extractedText,
+  /// Call GitHub Models API with base64-encoded image
+  static Future<Map<String, dynamic>> _callGitHubModelsWithImage(
+    String base64Image,
+    String mediaType,
   ) async {
     try {
       final headers = {
@@ -498,43 +511,52 @@ class AIService {
         'Authorization': 'Bearer ${AIConfig.githubToken}',
       };
 
-      // Updated prompt for OCR-extracted text (not image)
-      final invoicePrompt =
-          'Extract line items from this Vietnamese invoice text (extracted via OCR).\n'
+      const invoicePrompt =
+          'Extract line items from this Vietnamese invoice table.\n'
           'Return ONLY the items list, no markdown, no explanation.\n'
           'Format EACH item: ITEM: [product name] | AMOUNT: [number] | CATEGORY: [category]\n'
           '\n'
           'CRITICAL RULES:\n'
-          '1. Parse the extracted text to find product/item names and their amounts\n'
-          '2. Match EACH item name with the amount on the SAME LINE - this is critical!\n'
+          '1. Read ONLY the rightmost numeric column (final total column - "Thành Tiền Sau Thuế")\n'
+          '2. Match EACH item name with the amount on the SAME ROW - this is critical!\n'
           '3. Convert format: "27.500,00" → 27500 (remove separators, drop decimals)\n'
           '4. SKIP: Header rows, summary/total/subtotal rows, tax rows\n'
           '5. Item names should be product names (not column headers or totals)\n'
-          '6. Do NOT confuse amounts between different items\n'
+          '6. Do NOT confuse amounts between different rows\n'
           '\n'
           'Categories (text only, NO EMOJIS): Housing, Food, Transportation, Utilities, Healthcare, Entertainment, Shopping, Other\n'
           '\n'
           'Example output:\n'
           'ITEM: Nước rửa chén Sunlight chanh 750g | AMOUNT: 27500 | CATEGORY: Shopping\n'
-          'ITEM: Sữa chua uống men sống Probi dâu | AMOUNT: 124500 | CATEGORY: Food\n'
-          '\n'
-          'Extracted invoice text:\n$extractedText';
+          'ITEM: Sữa chua uống men sống Probi dâu | AMOUNT: 124500 | CATEGORY: Food';
 
       final body = jsonEncode({
         'messages': [
           {
             'role': 'system',
             'content': 'You are a precise invoice data extraction specialist. '
-                'Extract items from OCR-extracted text in this EXACT format: ITEM: [name] | AMOUNT: [number] | CATEGORY: [category] '
-                'READ CAREFULLY: Match item descriptions with amounts from the SAME LINE ONLY. '
-                'Do NOT mix up amounts between different items - each item gets ONE correct amount. '
+                'Extract items in this EXACT format: ITEM: [name] | AMOUNT: [number] | CATEGORY: [category] '
+                'READ CAREFULLY: Match item descriptions with amounts from the SAME ROW ONLY. '
+                'CRITICAL: Always read from the rightmost final-amount column ("Thành Tiền Sau Thuế"). '
+                'Do NOT mix up amounts between different rows - each item gets ONE correct amount. '
                 'Convert Vietnamese numbers (27.500,00) to plain integers (27500). '
                 'Use ONLY text category names (Food, Housing, etc) - NO EMOJI symbols. '
                 'Output ONLY the item lines, no JSON, no markdown, no explanations.',
           },
           {
             'role': 'user',
-            'content': invoicePrompt,
+            'content': [
+              {
+                'type': 'text',
+                'text': invoicePrompt,
+              },
+              {
+                'type': 'image_url',
+                'image_url': {
+                  'url': 'data:$mediaType;base64,$base64Image',
+                }
+              }
+            ],
           }
         ],
         'temperature': 0.3,
@@ -580,7 +602,7 @@ class AIService {
           }
 
           final data = jsonDecode(response.body);
-          _logger.info('API response received: ${data.runtimeType}');
+          _logger.info('data imported from API 123555: \n $data');
           _logger.fine('Successfully decoded JSON response');
 
           // Validate response structure
@@ -661,7 +683,7 @@ class AIService {
         return {
           'success': false,
           'error':
-              'AI service timeout: Text processing took too long. Please try again.'
+              'AI service timeout: Image processing took too long. Please try with a clearer or smaller invoice image.'
         };
       }
       return {'success': false, 'error': 'Network error: $e'};

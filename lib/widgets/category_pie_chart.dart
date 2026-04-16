@@ -9,6 +9,7 @@ class CategoryPieChart extends StatefulWidget {
   final Map<String, double> categoryData;
   final List<Color>? colors;
   final Color backgroundColor;
+  final Function(String category)? onCategoryTap;
 
   const CategoryPieChart({
     super.key,
@@ -16,6 +17,7 @@ class CategoryPieChart extends StatefulWidget {
     required this.categoryData,
     this.colors,
     this.backgroundColor = const Color(0xFFF5F5F5),
+    this.onCategoryTap,
   });
 
   @override
@@ -79,34 +81,43 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
                     hoveredIndex = null;
                   });
                 },
-                child: SizedBox(
-                  height: 250,
-                  child: PieChart(
-                    PieChartData(
-                      sections: _buildPieSections(entries, chartColors, total),
-                      centerSpaceRadius: 40,
-                      sectionsSpace: 2,
-                      pieTouchData: PieTouchData(
-                        enabled: true,
-                        touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                          try {
-                            if (pieTouchResponse != null &&
-                                pieTouchResponse.touchedSection != null) {
-                              final newIndex = pieTouchResponse
-                                  .touchedSection!.touchedSectionIndex;
-                              // Validate index before updating
-                              if (newIndex >= 0 && newIndex < entries.length) {
-                                if (hoveredIndex != newIndex) {
-                                  setState(() {
-                                    hoveredIndex = newIndex;
-                                  });
+                child: GestureDetector(
+                  onDoubleTap: () {
+                    // Handle double-tap on chart - navigate to transactions filtered by category
+                    if (hoveredIndex != null && hoveredIndex! < entries.length) {
+                      final selectedCategory = entries[hoveredIndex!].key;
+                      widget.onCategoryTap?.call(selectedCategory);
+                    }
+                  },
+                  child: SizedBox(
+                    height: 250,
+                    child: PieChart(
+                      PieChartData(
+                        sections: _buildPieSections(entries, chartColors, total),
+                        centerSpaceRadius: 40,
+                        sectionsSpace: 2,
+                        pieTouchData: PieTouchData(
+                          enabled: true,
+                          touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                            try {
+                              if (pieTouchResponse != null &&
+                                  pieTouchResponse.touchedSection != null) {
+                                final newIndex = pieTouchResponse
+                                    .touchedSection!.touchedSectionIndex;
+                                // Validate index before updating
+                                if (newIndex >= 0 && newIndex < entries.length) {
+                                  if (hoveredIndex != newIndex) {
+                                    setState(() {
+                                      hoveredIndex = newIndex;
+                                    });
+                                  }
                                 }
                               }
+                            } catch (e) {
+                              developer.log('Touch error: $e');
                             }
-                          } catch (e) {
-                            developer.log('Touch error: $e');
-                          }
-                        },
+                          },
+                        ),
                       ),
                     ),
                   ),

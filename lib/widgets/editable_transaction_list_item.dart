@@ -30,7 +30,6 @@ class _EditableTransactionListItemState
   late TextEditingController _amountController;
   late FocusNode _descriptionFocus;
   late FocusNode _amountFocus;
-  bool _isActive = false;
 
   @override
   void initState() {
@@ -42,10 +41,6 @@ class _EditableTransactionListItemState
     );
     _descriptionFocus = FocusNode();
     _amountFocus = FocusNode();
-
-    // Listen for focus changes
-    _descriptionFocus.addListener(_onFocusChange);
-    _amountFocus.addListener(_onFocusChange);
 
     // Listen for changes and update parent
     _descriptionController.addListener(_updateTransaction);
@@ -59,12 +54,6 @@ class _EditableTransactionListItemState
     _descriptionFocus.dispose();
     _amountFocus.dispose();
     super.dispose();
-  }
-
-  void _onFocusChange() {
-    setState(() {
-      _isActive = _descriptionFocus.hasFocus || _amountFocus.hasFocus;
-    });
   }
 
   void _updateTransaction() {
@@ -107,12 +96,8 @@ class _EditableTransactionListItemState
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = _isActive
-        ? (isDarkMode ? Colors.blue[900]?.withOpacity(0.3) : Colors.blue[50])
-        : (isDarkMode ? Colors.grey[800] : Colors.grey[100]);
-    final borderColor = _isActive
-        ? (isDarkMode ? Colors.blue[400] : Colors.blue[200])
-        : (isDarkMode ? Colors.grey[700] : Colors.grey[300]);
+    final bgColor = isDarkMode ? Colors.grey[800] : Colors.grey[100];
+    final borderColor = isDarkMode ? Colors.grey[700] : Colors.grey[300];
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
@@ -190,17 +175,8 @@ class _EditableTransactionListItemState
                       vertical: 8,
                     ),
                     isDense: true,
-                    enabledBorder: OutlineInputBorder(
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(4),
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.grey[600]! : Colors.grey[300]!,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.grey[500]! : Colors.grey[400]!,
-                      ),
                     ),
                     filled: true,
                     fillColor: isDarkMode ? Colors.grey[700] : Colors.white,
@@ -230,17 +206,8 @@ class _EditableTransactionListItemState
                       vertical: 8,
                     ),
                     isDense: true,
-                    enabledBorder: OutlineInputBorder(
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(4),
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.grey[600]! : Colors.grey[300]!,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.grey[500]! : Colors.grey[400]!,
-                      ),
                     ),
                     filled: true,
                     fillColor: isDarkMode ? Colors.grey[700] : Colors.white,

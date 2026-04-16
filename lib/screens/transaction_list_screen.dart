@@ -40,18 +40,25 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   @override
   Widget build(BuildContext context) {
     try {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Transactions'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () {
-                context.read<AuthProvider>().signOut();
-              },
-            ),
-          ],
-        ),
+      return PopScope(
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) {
+            // Clear the category filter when navigating back
+            context.read<TransactionProvider>().setSelectedCategory(null);
+          }
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Transactions'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.logout),
+                onPressed: () {
+                  context.read<AuthProvider>().signOut();
+                },
+              ),
+            ],
+          ),
         body: Consumer<TransactionProvider>(
           builder: (context, transactionProvider, _) {
             try {
@@ -159,6 +166,52 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                       ],
                     ),
                   ),
+                  // Category Filter (if selected)
+                  if (transactionProvider.selectedCategory != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withValues(alpha: 0.1),
+                                border: Border.all(color: Colors.blue),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Category: ${transactionProvider.selectedCategory}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.blue,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      transactionProvider
+                                          .setSelectedCategory(null);
+                                    },
+                                    child: const Icon(Icons.close,
+                                        size: 18, color: Colors.blue),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   // Totals Section
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -281,16 +334,17 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
             }
           },
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AddTransactionScreen(),
-              ),
-            );
-          },
-          child: const Icon(Icons.add),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AddTransactionScreen(),
+                ),
+              );
+            },
+            child: const Icon(Icons.add),
+          ),
         ),
       );
     } catch (e) {

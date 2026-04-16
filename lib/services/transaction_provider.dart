@@ -20,6 +20,7 @@ class TransactionProvider extends ChangeNotifier {
   // Filter state
   FilterType _filterType = FilterType.month; // Default filter is by month
   DateTime _selectedDate = DateTime.now();
+  String? _selectedCategory; // Filter by category (null = no category filter)
 
   // Invoice import state
   InvoiceImportStep _currentImportStep = InvoiceImportStep.none;
@@ -37,6 +38,7 @@ class TransactionProvider extends ChangeNotifier {
   String? get error => _error;
   FilterType get filterType => _filterType;
   DateTime get selectedDate => _selectedDate;
+  String? get selectedCategory => _selectedCategory;
 
   // Invoice import state getters
   InvoiceImportStep get currentImportStep => _currentImportStep;
@@ -44,15 +46,20 @@ class TransactionProvider extends ChangeNotifier {
   double get processingProgress => _processingProgress;
   double get uploadProgress => _uploadProgress;
 
-  // Get filtered transactions based on filter type and selected date
+  // Get filtered transactions based on filter type, selected date, and category
   List<Transaction> get filteredTransactions {
     final filtered = _transactions.where((transaction) {
-      final matches = _filterType == FilterType.month
+      // Filter by date
+      final dateMatches = _filterType == FilterType.month
           ? transaction.date.year == _selectedDate.year &&
               transaction.date.month == _selectedDate.month
           : transaction.date.year == _selectedDate.year;
 
-      return matches;
+      // Filter by category if selected
+      final categoryMatches =
+          _selectedCategory == null || transaction.category == _selectedCategory;
+
+      return dateMatches && categoryMatches;
     }).toList();
     return filtered;
   }
@@ -201,6 +208,11 @@ class TransactionProvider extends ChangeNotifier {
 
   void setSelectedDate(DateTime date) {
     _selectedDate = date;
+    notifyListeners();
+  }
+
+  void setSelectedCategory(String? category) {
+    _selectedCategory = category;
     notifyListeners();
   }
 

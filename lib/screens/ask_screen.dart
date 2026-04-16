@@ -164,12 +164,17 @@ class _AskScreenState extends State<AskScreen> {
                   );
                 }
 
+                // Show only the 10 most recent messages include ask and answer
+                final displayMessages = messages.length > 10
+                    ? messages.sublist(messages.length - 10)
+                    : messages;
+
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
-                  itemCount: messages.length,
+                  itemCount: displayMessages.length,
                   itemBuilder: (context, index) {
-                    final message = messages[index];
+                    final message = displayMessages[index];
                     return _buildMessageBubble(message);
                   },
                 );
@@ -336,10 +341,10 @@ class _AskScreenState extends State<AskScreen> {
               final navigator = Navigator.of(context);
               final messenger = ScaffoldMessenger.of(context);
               final chatProvider = context.read<ChatProvider>();
-              
+
               navigator.pop();
               await chatProvider.clearHistory();
-              
+
               if (mounted) {
                 messenger.showSnackBar(
                   const SnackBar(content: Text('Chat history cleared')),

@@ -4,6 +4,8 @@ import 'package:mamoney/services/transaction_provider.dart';
 import 'package:mamoney/widgets/category_pie_chart.dart';
 import 'package:mamoney/widgets/chart_tab_toggle.dart';
 import 'package:mamoney/widgets/category_breakdown_list.dart';
+import 'package:provider/provider.dart';
+import 'package:mamoney/screens/transaction_list_screen.dart';
 
 class CategoryChartSection extends StatefulWidget {
   final TransactionProvider transactionProvider;
@@ -53,6 +55,9 @@ class _CategoryChartSectionState extends State<CategoryChartSection> {
                   Color(0xFFA5D6A7),
                   Color(0xFFFFeb3b),
                 ],
+                onCategoryTap: (category) {
+                  _navigateToTransactionsList(context, category);
+                },
               )
             : CategoryPieChart(
                 title: 'Expenses by Category',
@@ -65,6 +70,9 @@ class _CategoryChartSectionState extends State<CategoryChartSection> {
                   Color(0xFFEF9A9A),
                   Color(0xFFFF9800),
                 ],
+                onCategoryTap: (category) {
+                  _navigateToTransactionsList(context, category);
+                },
               ),
         const SizedBox(height: 8),
         // Category breakdown list
@@ -82,6 +90,18 @@ class _CategoryChartSectionState extends State<CategoryChartSection> {
                 isIncome: false,
               ),
       ],
+    );
+  }
+
+  void _navigateToTransactionsList(BuildContext context, String category) {
+    // Set the selected category filter
+    context.read<TransactionProvider>().setSelectedCategory(category);
+
+    // Navigate to transactions list screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const TransactionListScreen(),
+      ),
     );
   }
 }

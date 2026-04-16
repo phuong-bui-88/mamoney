@@ -127,35 +127,23 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                 style: Theme.of(context).textTheme.labelMedium,
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<TransactionType>(
-                      title: const Text('Income'),
-                      value: TransactionType.income,
-                      groupValue: _selectedType,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedType = value!;
-                        });
-                      },
-                      contentPadding: EdgeInsets.zero,
-                    ),
+              SegmentedButton<TransactionType>(
+                segments: const <ButtonSegment<TransactionType>>[
+                  ButtonSegment<TransactionType>(
+                    value: TransactionType.income,
+                    label: Text('Income'),
                   ),
-                  Expanded(
-                    child: RadioListTile<TransactionType>(
-                      title: const Text('Expense'),
-                      value: TransactionType.expense,
-                      groupValue: _selectedType,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedType = value!;
-                        });
-                      },
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                  ButtonSegment<TransactionType>(
+                    value: TransactionType.expense,
+                    label: Text('Expense'),
                   ),
                 ],
+                selected: <TransactionType>{_selectedType},
+                onSelectionChanged: (Set<TransactionType> newSelection) {
+                  setState(() {
+                    _selectedType = newSelection.first;
+                  });
+                },
               ),
               const SizedBox(height: 16),
               // Category selector

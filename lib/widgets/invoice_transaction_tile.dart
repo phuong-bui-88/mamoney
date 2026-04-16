@@ -8,9 +8,6 @@ import 'package:mamoney/services/firebase_service.dart';
 import 'package:provider/provider.dart';
 import 'package:mamoney/services/transaction_provider.dart';
 import 'package:mamoney/widgets/rag_ai_badge.dart';
-import 'package:logging/logging.dart';
-
-final _logger = Logger('InvoiceTransactionTile');
 
 class InvoiceTransactionTile extends StatelessWidget {
   final Transaction transaction;

@@ -114,7 +114,7 @@ class _EditableTransactionListItemState
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: _getTypeColor().withOpacity(0.2),
+              color: _getTypeColor().withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.center,
@@ -138,7 +138,7 @@ class _EditableTransactionListItemState
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: _getTypeColor().withOpacity(0.2),
+                        color: _getTypeColor().withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(

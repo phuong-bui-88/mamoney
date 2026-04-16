@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mamoney/screens/add_transaction_screen.dart';
 import 'package:mamoney/utils/input_formatters.dart';
 import 'package:mamoney/models/transaction.dart';
+import 'package:mamoney/widgets/chat_bubble_widget.dart';
+import 'package:mamoney/widgets/transaction_card_widget.dart';
 
 void main() {
   group('ChatMessage', () {

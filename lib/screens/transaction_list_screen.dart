@@ -51,6 +51,21 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
           appBar: AppBar(
             title: const Text('Transactions'),
             actions: [
+              Consumer<TransactionProvider>(
+                builder: (context, transactionProvider, _) {
+                  return IconButton(
+                    icon: const Icon(Icons.calendar_today),
+                    onPressed: () {
+                      if (transactionProvider.filterType == FilterType.month) {
+                        _selectMonthYear(context, transactionProvider);
+                      } else {
+                        _selectYear(context, transactionProvider);
+                      }
+                    },
+                    tooltip: 'Select date',
+                  );
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.logout),
                 onPressed: () {

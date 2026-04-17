@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/chat_message.dart';
+import '../models/transaction.dart';
 import '../services/ai_service.dart';
 import '../services/chat_provider.dart';
 import '../services/transaction_embeddings.dart';
@@ -111,6 +112,21 @@ class _AskScreenState extends State<AskScreen> {
         elevation: 0,
         title: const Text('Ask Financial AI'),
         actions: [
+          Consumer<TransactionProvider>(
+            builder: (context, transactionProvider, _) {
+              return IconButton(
+                icon: const Icon(Icons.calendar_today),
+                onPressed: () {
+                  if (transactionProvider.filterType == FilterType.month) {
+                    _selectMonthYear(context, transactionProvider);
+                  } else {
+                    _selectYear(context, transactionProvider);
+                  }
+                },
+                tooltip: 'Select date',
+              );
+            },
+          ),
           // Clear history button
           IconButton(
             icon: const Icon(Icons.delete_outline),
@@ -356,5 +372,315 @@ class _AskScreenState extends State<AskScreen> {
         ],
       ),
     );
+  }
+
+  void _selectMonthYear(BuildContext context, TransactionProvider provider) {
+    final currentDate = provider.selectedDate;
+    int selectedMonth = currentDate.month;
+    int selectedYear = currentDate.year;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header with selected month and year
+                  Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${_getMonthName(selectedMonth)} $selectedYear',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Year with controls
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.expand_less,
+                                  color: Colors.white, size: 24),
+                              onPressed: () {
+                                setDialogState(() {
+                                  selectedYear--;
+                                });
+                              },
+                            ),
+                            const SizedBox(width: 16),
+                            Text(
+                              selectedYear.toString(),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            IconButton(
+                              icon: const Icon(Icons.expand_more,
+                                  color: Colors.white, size: 24),
+                              onPressed: () {
+                                setDialogState(() {
+                                  selectedYear++;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Content area with month selector
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Month grid
+                        GridView.count(
+                          shrinkWrap: true,
+                          crossAxisCount: 4,
+                          childAspectRatio: 1.0,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                          children: List.generate(12, (index) {
+                            final month = index + 1;
+                            final isSelected = selectedMonth == month;
+                            return GestureDetector(
+                              onTap: () {
+                                provider.setSelectedDate(
+                                  DateTime(selectedYear, month),
+                                );
+                                Navigator.pop(context);
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.blue
+                                      : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _getMonthName(month).substring(0, 3),
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.black,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Action buttons (Cancel only - selection auto-submits)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _selectYear(BuildContext context, TransactionProvider provider) {
+    final currentDate = provider.selectedDate;
+    int selectedYear = currentDate.year;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header with selected year
+                  Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          selectedYear.toString(),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Navigation buttons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.expand_less,
+                                  color: Colors.white, size: 24),
+                              onPressed: () {
+                                setDialogState(() {
+                                  selectedYear--;
+                                });
+                              },
+                            ),
+                            const SizedBox(width: 16),
+                            const Text(
+                              'Year',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            IconButton(
+                              icon: const Icon(Icons.expand_more,
+                                  color: Colors.white, size: 24),
+                              onPressed: () {
+                                setDialogState(() {
+                                  selectedYear++;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Content area
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Display year with selection button
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                selectedYear.toString(),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  provider.setSelectedDate(
+                                    DateTime(selectedYear),
+                                  );
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('Select'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Action buttons
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return months[month - 1];
+  }
+
+  String _getFormattedDate(FilterType filterType, DateTime date) {
+    if (filterType == FilterType.month) {
+      return '${_getMonthName(date.month)} ${date.year}';
+    } else {
+      return date.year.toString();
+    }
   }
 }

@@ -6,6 +6,7 @@ import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/screens/add_transaction_screen.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:mamoney/widgets/category_chart_section.dart';
+import 'package:mamoney/widgets/net_balance_chart.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -38,6 +39,21 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         centerTitle: true,
         actions: [
+          Consumer<TransactionProvider>(
+            builder: (context, transactionProvider, _) {
+              return IconButton(
+                icon: const Icon(Icons.calendar_today),
+                onPressed: () {
+                  if (transactionProvider.filterType == FilterType.month) {
+                    _selectMonthYear(context, transactionProvider);
+                  } else {
+                    _selectYear(context, transactionProvider);
+                  }
+                },
+                tooltip: 'Select date',
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
@@ -253,6 +269,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Net Balance Chart - Shows expense - income by month
+                      NetBalanceChart(
+                        transactionProvider: transactionProvider,
                       ),
                       const SizedBox(height: 24),
 

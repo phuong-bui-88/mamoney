@@ -56,8 +56,8 @@ class TransactionProvider extends ChangeNotifier {
           : transaction.date.year == _selectedDate.year;
 
       // Filter by category if selected
-      final categoryMatches =
-          _selectedCategory == null || transaction.category == _selectedCategory;
+      final categoryMatches = _selectedCategory == null ||
+          transaction.category == _selectedCategory;
 
       return dateMatches && categoryMatches;
     }).toList();
@@ -264,6 +264,77 @@ class TransactionProvider extends ChangeNotifier {
         .where((t) => t.type == TransactionType.expense)
         .toList();
     return getCategoryBreakdown(expenseTransactions);
+  }
+
+  /// Get net balance (expense - income) for each month
+  /// Returns a map of DateTime (first day of month) to net balance values
+  /// monthsToShow determines how many months to include (from current selection backwards)
+  Map<DateTime, double> getNetBalanceByMonth(int monthsToShow) {
+    final result = <DateTime, double>{};
+
+    // Start from the selected date and go backwards
+    for (int i = monthsToShow - 1; i >= 0; i--) {
+      final targetMonth = DateTime(
+        _selectedDate.year,
+        _selectedDate.month - i,
+        1,
+      );
+
+      // Calculate total income and expense for this month
+      final monthTransactions = _transactions.where((t) {
+        return t.date.year == targetMonth.year &&
+            t.date.month == targetMonth.month;
+      }).toList();
+
+      final monthIncome = monthTransactions
+          .where((t) => t.type == TransactionType.income)
+          .fold<double>(0, (sum, t) => sum + t.amount);
+
+      final monthExpense = monthTransactions
+          .where((t) => t.type == TransactionType.expense)
+          .fold<double>(0, (sum, t) => sum + t.amount);
+
+      // Net balance = expense - income (positive means net loss, negative means net profit)
+      result[targetMonth] = monthExpense - monthIncome;
+    }
+
+    return result;
+  }
+
+  /// Returns a map of DateTime (first day of month) to net balance values
+  /// Always calculates from today backwards (not affected by filter selection)
+  /// Used for the home screen chart to show 12-month rolling window
+  Map<DateTime, double> getNetBalanceByMonthFromToday(int monthsToShow) {
+    final result = <DateTime, double>{};
+    final today = DateTime.now();
+
+    // Start from today and go backwards
+    for (int i = monthsToShow - 1; i >= 0; i--) {
+      final targetMonth = DateTime(
+        today.year,
+        today.month - i,
+        1,
+      );
+
+      // Calculate total income and expense for this month
+      final monthTransactions = _transactions.where((t) {
+        return t.date.year == targetMonth.year &&
+            t.date.month == targetMonth.month;
+      }).toList();
+
+      final monthIncome = monthTransactions
+          .where((t) => t.type == TransactionType.income)
+          .fold<double>(0, (sum, t) => sum + t.amount);
+
+      final monthExpense = monthTransactions
+          .where((t) => t.type == TransactionType.expense)
+          .fold<double>(0, (sum, t) => sum + t.amount);
+
+      // Net balance = expense - income (positive means net loss, negative means net profit)
+      result[targetMonth] = monthExpense - monthIncome;
+    }
+
+    return result;
   }
 
   /// Create invoice groups from filtered transactions

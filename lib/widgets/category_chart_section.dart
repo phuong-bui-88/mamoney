@@ -82,12 +82,18 @@ class _CategoryChartSectionState extends State<CategoryChartSection> {
                     widget.transactionProvider.getIncomeCategoryBreakdown(),
                 totalAmount: widget.transactionProvider.filteredTotalIncome,
                 isIncome: true,
+                onCategoryTap: (category) {
+                  _navigateToTransactionsList(context, category);
+                },
               )
             : CategoryBreakdownList(
                 categoryData:
                     widget.transactionProvider.getExpenseCategoryBreakdown(),
                 totalAmount: widget.transactionProvider.filteredTotalExpense,
                 isIncome: false,
+                onCategoryTap: (category) {
+                  _navigateToTransactionsList(context, category);
+                },
               ),
       ],
     );

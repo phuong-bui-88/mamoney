@@ -22,28 +22,23 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
 
   @override
   Widget build(BuildContext context) {
-    // Get net balance data for 12 months from today (not affected by filter selection)
     final netBalanceData =
         widget.transactionProvider.getNetBalanceByMonthFromToday(12);
 
-    // Get sorted months for display
     final months = netBalanceData.keys.toList()..sort();
     final values = months.map((month) => netBalanceData[month]!).toList();
 
-    // Find min and max for Y-axis scaling
     final maxAbsValue = values.isEmpty
         ? 1.0
         : values.reduce((a, b) => a.abs() > b.abs() ? a.abs() : b.abs());
 
-    // Round up to nearest sensible interval (1M, 5M, 10M, etc.)
     final maxValue =
         values.isEmpty ? 1.0 : _roundUpToNearestInterval(maxAbsValue);
-    final minValue = -maxValue * 0.1; // Add some negative space for balance
+    final minValue = -maxValue * 0.1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Title
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 16),
           child: Text(
@@ -55,7 +50,6 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
             ),
           ),
         ),
-        // Chart container
         Container(
           height: 380,
           padding: const EdgeInsets.fromLTRB(8, 24, 16, 32),
@@ -82,10 +76,8 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
                             BarChartRodData(
                               toY: value,
                               color: isPositive
-                                  ? const Color(
-                                      0xFFEF5350) // Slightly softer red
-                                  : const Color(
-                                      0xFF66BB6A), // Slightly softer green
+                                  ? const Color(0xFFEF5350)
+                                  : const Color(0xFF66BB6A),
                               width: 18,
                               borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(6),
@@ -127,7 +119,7 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
                               return Padding(
                                 padding: const EdgeInsets.only(top: 12.0),
                                 child: Text(
-                                  DateFormat('MMM').format(month),
+                                  DateFormat('M').format(month), // <-- changed
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.grey,
@@ -180,7 +172,7 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
                           final month = months[groupIndex];
                           final amount = rod.toY;
                           return BarTooltipItem(
-                            '${DateFormat('MMM yyyy').format(month)}\n',
+                            '${DateFormat('MM yyyy').format(month)}\n',
                             const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -207,14 +199,12 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
                           final tappedIndex =
                               response?.spot?.touchedBarGroupIndex;
 
-                          // Toggle off if tapping the same bar again
                           setState(() {
                             _selectedBarIndex = tappedIndex == _selectedBarIndex
                                 ? null
                                 : tappedIndex;
                           });
 
-                          // Navigate to month on tap
                           if (tappedIndex != null &&
                               tappedIndex >= 0 &&
                               tappedIndex < months.length) {
@@ -230,7 +220,6 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
                   ),
                 ),
         ),
-        // Legend
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Row(
@@ -277,26 +266,21 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
     );
   }
 
-  // Helper method to format currency in compact form (e.g., 0, 5tr)
   String _formatCompactCurrency(double value) {
     if (value == 0) {
       return '0';
     }
 
-    // Convert to millions (tr = triệu in Vietnamese)
     final millions = value / 1000000;
 
     if (millions.abs() < 1) {
-      // Less than 1 million, show as is
       return value.toStringAsFixed(0);
     } else if (millions.abs() < 1000) {
-      // Show with 1 decimal place if there's a fractional part
       final formatted = millions % 1 == 0
           ? millions.toStringAsFixed(0)
           : millions.toStringAsFixed(1);
       return '$formatted tr';
     } else {
-      // 1 billion or more, show as billions
       final billions = value / 1000000000;
       final formatted = billions % 1 == 0
           ? billions.toStringAsFixed(0)
@@ -305,15 +289,12 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
     }
   }
 
-  // Helper method to round up to nearest sensible interval
   double _roundUpToNearestInterval(double value) {
     if (value == 0) return 1.0;
 
-    // Determine the order of magnitude
     final magnitude = 10 * (value.abs() / 10).floor().toStringAsFixed(0).length;
     final interval = (value.abs() / magnitude).ceil() * magnitude;
 
-    // Use sensible intervals: 1M, 5M, 10M, 20M, etc.
     if (interval < 5000000) {
       return ((interval / 1000000).ceil() * 1000000).toDouble();
     } else if (interval < 50000000) {

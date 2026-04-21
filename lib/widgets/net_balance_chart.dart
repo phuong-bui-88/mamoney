@@ -5,7 +5,7 @@ import 'package:mamoney/models/transaction.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:intl/intl.dart';
 
-class NetBalanceChart extends StatelessWidget {
+class NetBalanceChart extends StatefulWidget {
   final TransactionProvider transactionProvider;
 
   const NetBalanceChart({
@@ -14,10 +14,17 @@ class NetBalanceChart extends StatelessWidget {
   });
 
   @override
+  State<NetBalanceChart> createState() => _NetBalanceChartState();
+}
+
+class _NetBalanceChartState extends State<NetBalanceChart> {
+  int? _selectedBarIndex;
+
+  @override
   Widget build(BuildContext context) {
     // Get net balance data for 12 months from today (not affected by filter selection)
     final netBalanceData =
-        transactionProvider.getNetBalanceByMonthFromToday(12);
+        widget.transactionProvider.getNetBalanceByMonthFromToday(12);
 
     // Get sorted months for display
     final months = netBalanceData.keys.toList()..sort();
@@ -69,6 +76,8 @@ class NetBalanceChart extends StatelessWidget {
 
                         return BarChartGroupData(
                           x: index,
+                          showingTooltipIndicators:
+                              _selectedBarIndex == index ? [0] : [],
                           barRods: [
                             BarChartRodData(
                               toY: value,
@@ -162,7 +171,7 @@ class NetBalanceChart extends StatelessWidget {
                     maxY: maxValue > 0 ? maxValue : 1,
                     barTouchData: BarTouchData(
                       enabled: true,
-                      handleBuiltInTouches: true,
+                      handleBuiltInTouches: false,
                       touchTooltipData: BarTouchTooltipData(
                         direction: TooltipDirection.top,
                         tooltipPadding: const EdgeInsets.symmetric(
@@ -194,15 +203,26 @@ class NetBalanceChart extends StatelessWidget {
                       ),
                       touchCallback:
                           (FlTouchEvent event, BarTouchResponse? response) {
-                        if (event is FlTapUpEvent && response?.spot != null) {
-                          final groupIndex =
-                              response!.spot!.touchedBarGroupIndex;
-                          if (groupIndex >= 0 && groupIndex < months.length) {
-                            final selectedMonth = months[groupIndex];
-                            // Ensure filter type is set to month
-                            transactionProvider.setFilterType(FilterType.month);
-                            // Set the selected date to the clicked month
-                            transactionProvider.setSelectedDate(selectedMonth);
+                        if (event is FlTapUpEvent) {
+                          final tappedIndex =
+                              response?.spot?.touchedBarGroupIndex;
+
+                          // Toggle off if tapping the same bar again
+                          setState(() {
+                            _selectedBarIndex = tappedIndex == _selectedBarIndex
+                                ? null
+                                : tappedIndex;
+                          });
+
+                          // Navigate to month on tap
+                          if (tappedIndex != null &&
+                              tappedIndex >= 0 &&
+                              tappedIndex < months.length) {
+                            final selectedMonth = months[tappedIndex];
+                            widget.transactionProvider
+                                .setFilterType(FilterType.month);
+                            widget.transactionProvider
+                                .setSelectedDate(selectedMonth);
                           }
                         }
                       },

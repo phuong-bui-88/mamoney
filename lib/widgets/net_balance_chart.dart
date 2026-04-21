@@ -31,16 +31,16 @@ class NetBalanceChart extends StatelessWidget {
     // Round up to nearest sensible interval (1M, 5M, 10M, etc.)
     final maxValue =
         values.isEmpty ? 1.0 : _roundUpToNearestInterval(maxAbsValue);
-    final minValue = -maxValue;
+    final minValue = -maxValue * 0.1; // Add some negative space for balance
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title
         const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 16),
           child: Text(
-            'Net Balance (Expense - Income)',
+            'Net Balance (Last 12 Months)',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -50,8 +50,8 @@ class NetBalanceChart extends StatelessWidget {
         ),
         // Chart container
         Container(
-          height: 300,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          height: 380,
+          padding: const EdgeInsets.fromLTRB(8, 24, 16, 32),
           child: values.isEmpty
               ? Center(
                   child: Text(
@@ -73,15 +73,16 @@ class NetBalanceChart extends StatelessWidget {
                             BarChartRodData(
                               toY: value,
                               color: isPositive
-                                  ? Colors.redAccent
-                                  : Colors.greenAccent,
-                              width: 12,
+                                  ? const Color(
+                                      0xFFEF5350) // Slightly softer red
+                                  : const Color(
+                                      0xFF66BB6A), // Slightly softer green
+                              width: 18,
                               borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4),
+                                top: Radius.circular(6),
                               ),
                             ),
                           ],
-                          showingTooltipIndicators: [0],
                         );
                       },
                     ),
@@ -89,15 +90,19 @@ class NetBalanceChart extends StatelessWidget {
                       leftTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          reservedSize: 80,
+                          reservedSize: 55,
                           getTitlesWidget: (value, meta) {
-                            return Text(
-                              formatCurrency(value),
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey,
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: Text(
+                                _formatCompactCurrency(value),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.right,
                               ),
-                              textAlign: TextAlign.right,
                             );
                           },
                         ),
@@ -105,17 +110,19 @@ class NetBalanceChart extends StatelessWidget {
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
+                          reservedSize: 40,
                           getTitlesWidget: (value, meta) {
                             final index = value.toInt();
                             if (index >= 0 && index < months.length) {
                               final month = months[index];
                               return Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
+                                padding: const EdgeInsets.only(top: 12.0),
                                 child: Text(
                                   DateFormat('MMM').format(month),
                                   style: const TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     color: Colors.grey,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               );
@@ -138,19 +145,28 @@ class NetBalanceChart extends StatelessWidget {
                       horizontalInterval: maxValue / 4,
                       getDrawingHorizontalLine: (value) {
                         return FlLine(
-                          color: Colors.grey[200],
-                          strokeWidth: 0.8,
+                          color: Colors.grey[300],
+                          strokeWidth: 0.5,
+                          dashArray: [5, 5],
                         );
                       },
                     ),
-                    borderData: FlBorderData(show: false),
+                    borderData: FlBorderData(
+                      show: true,
+                      border: Border(
+                        left: BorderSide(color: Colors.grey[300]!),
+                        bottom: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
                     minY: 0,
                     maxY: maxValue > 0 ? maxValue : 1,
                     barTouchData: BarTouchData(
                       enabled: true,
-                      handleBuiltInTouches: false,
+                      handleBuiltInTouches: true,
                       touchTooltipData: BarTouchTooltipData(
                         direction: TooltipDirection.top,
+                        tooltipPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
                           final month = months[groupIndex];
                           final amount = rod.toY;
@@ -158,7 +174,7 @@ class NetBalanceChart extends StatelessWidget {
                             '${DateFormat('MMM yyyy').format(month)}\n',
                             const TextStyle(
                               color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w600,
                               fontSize: 12,
                             ),
                             children: [
@@ -166,9 +182,10 @@ class NetBalanceChart extends StatelessWidget {
                                 text: formatCurrency(amount),
                                 style: TextStyle(
                                   color: amount > 0
-                                      ? Colors.redAccent
-                                      : Colors.greenAccent,
+                                      ? const Color(0xFFFFB74D)
+                                      : const Color(0xFF81C784),
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 13,
                                 ),
                               ),
                             ],
@@ -195,13 +212,19 @@ class NetBalanceChart extends StatelessWidget {
         ),
         // Legend
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildLegendItem(Colors.redAccent, 'Loss (Expense > Income)'),
-              const SizedBox(width: 24),
-              _buildLegendItem(Colors.greenAccent, 'Profit (Income > Expense)'),
+              _buildLegendItem(
+                const Color(0xFFEF5350),
+                'Loss (Expenses > Income)',
+              ),
+              const SizedBox(width: 32),
+              _buildLegendItem(
+                const Color(0xFF66BB6A),
+                'Profit (Income > Expenses)',
+              ),
             ],
           ),
         ),
@@ -214,23 +237,52 @@ class NetBalanceChart extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 12,
-          height: 12,
+          width: 14,
+          height: 14,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(3),
           ),
         ),
         const SizedBox(width: 8),
         Text(
           label,
           style: const TextStyle(
-            fontSize: 12,
+            fontSize: 13,
             color: Colors.grey,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
     );
+  }
+
+  // Helper method to format currency in compact form (e.g., 0, 5tr)
+  String _formatCompactCurrency(double value) {
+    if (value == 0) {
+      return '0';
+    }
+
+    // Convert to millions (tr = triệu in Vietnamese)
+    final millions = value / 1000000;
+
+    if (millions.abs() < 1) {
+      // Less than 1 million, show as is
+      return value.toStringAsFixed(0);
+    } else if (millions.abs() < 1000) {
+      // Show with 1 decimal place if there's a fractional part
+      final formatted = millions % 1 == 0
+          ? millions.toStringAsFixed(0)
+          : millions.toStringAsFixed(1);
+      return '$formatted tr';
+    } else {
+      // 1 billion or more, show as billions
+      final billions = value / 1000000000;
+      final formatted = billions % 1 == 0
+          ? billions.toStringAsFixed(0)
+          : billions.toStringAsFixed(1);
+      return '$formatted tỷ';
+    }
   }
 
   // Helper method to round up to nearest sensible interval

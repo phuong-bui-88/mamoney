@@ -227,12 +227,12 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
             children: [
               _buildLegendItem(
                 const Color(0xFFEF5350),
-                'Loss (Expenses > Income)',
+                'Loss',
               ),
               const SizedBox(width: 32),
               _buildLegendItem(
                 const Color(0xFF66BB6A),
-                'Profit (Income > Expenses)',
+                'Profit',
               ),
             ],
           ),
@@ -271,10 +271,16 @@ class _NetBalanceChartState extends State<NetBalanceChart> {
       return '0';
     }
 
+    final thousands = value / 1000;
     final millions = value / 1000000;
 
-    if (millions.abs() < 1) {
+    if (thousands.abs() < 1) {
       return value.toStringAsFixed(0);
+    } else if (thousands.abs() < 1000) {
+      final formatted = thousands % 1 == 0
+          ? thousands.toStringAsFixed(0)
+          : thousands.toStringAsFixed(1);
+      return '${formatted}k';
     } else if (millions.abs() < 1000) {
       final formatted = millions % 1 == 0
           ? millions.toStringAsFixed(0)

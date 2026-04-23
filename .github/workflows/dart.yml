@@ -1,50 +1,33 @@
-name: iOS-ipa-build
-
-on:
-  workflow_dispatch:
+name: Build Unsigned IPA
+on: [push, workflow_dispatch]
 
 jobs:
-  build-ios:
-    name: 🎉 iOS Build
+  build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - uses: subosito/flutter-action@v2
+      # For Flutter projects:
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          architecture: x64
-      - run: flutter pub get
       
-      - name: Debug print GITHUB_TOKEN_API (masked)
-        run: echo "TOKEN=${{ secrets.TOKEN_API }}"
+      - name: Build Unsigned App Bundle
+        run: flutter build ios --release --no-codesign
+        # For Native iOS (use xcodebuild):
+        # run: xcodebuild -workspace YourApp.xcworkspace -scheme YourScheme -configuration Release CODE_SIGNING_ALLOWED=NO
 
-      - run: pod repo update
-        working-directory: ios
-
-      
-      - name: Build iOS with dart-define
+      - name: Package into IPA
         run: |
-          flutter build ios \
-            --release \
-            --no-codesign \
-            --dart-define=GITHUB_TOKEN=${{ secrets.TOKEN_API }}
+          mkdir -p build/ios/iphoneos/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          cd build/ios/iphoneos
+          zip -qq -r -9 unsigned-app.ipa Payload
 
-      - run: mkdir Payload
-        working-directory: build/ios/iphoneos
-
-      - run: mv Runner.app/ Payload
-        working-directory: build/ios/iphoneos
-
-      - name: Zip output
-        run: zip -qq -r -9 FlutterIpaExport.ipa Payload
-        working-directory: build/ios/iphoneos
-
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/ios/iphoneos/FlutterIpaExport.ipa
-          tag: v2.4
-          overwrite: true
-          body: "This is v2.4 release"
+          name: unsigned-ipa
+          path: build/ios/iphoneos/unsigned-app.ipa

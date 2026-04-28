@@ -6,6 +6,7 @@ import 'package:mamoney/services/firebase_service.dart';
 import 'package:mamoney/services/auth_provider.dart';
 import 'package:mamoney/services/transaction_provider.dart';
 import 'package:mamoney/services/chat_provider.dart';
+import 'package:mamoney/services/connectivity_provider.dart';
 import 'package:mamoney/screens/login_screen.dart';
 // ...existing code...
 import 'package:logging/logging.dart';
@@ -43,6 +44,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<ConnectivityProvider>(
+          create: (_) => ConnectivityProvider()..initialize(),
+        ),
         ChangeNotifierProvider<AuthProvider>(
           create: (_) => AuthProvider(),
         ),

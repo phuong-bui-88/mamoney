@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mamoney/models/transaction_sync_status.dart';
 
 enum TransactionType { income, expense }
 
@@ -18,6 +19,7 @@ class Transaction {
   final String? invoiceId; // Groups transactions imported from same invoice
   final DateTime? invoiceDate; // When the invoice was imported
   final String? ragId; // AI request ID from RAG API response (if AI-generated)
+  final TransactionSyncStatus syncStatus; // Sync status with Firestore
 
   Transaction({
     required this.id,
@@ -33,6 +35,7 @@ class Transaction {
     this.invoiceId,
     this.invoiceDate,
     this.ragId,
+    this.syncStatus = TransactionSyncStatus.synced,
   });
 
   // Convert Transaction to JSON
@@ -52,6 +55,7 @@ class Transaction {
       'invoiceDate':
           invoiceDate != null ? Timestamp.fromDate(invoiceDate!) : null,
       'ragId': ragId,
+      'syncStatus': syncStatus.toString().split('.').last,
     };
   }
 
@@ -75,6 +79,8 @@ class Transaction {
           ? (map['invoiceDate'] as Timestamp).toDate()
           : null,
       ragId: map['ragId'],
+      syncStatus: (map['syncStatus'] as String?)?.toSyncStatus() ??
+          TransactionSyncStatus.synced,
     );
   }
 
@@ -93,6 +99,7 @@ class Transaction {
     String? invoiceId,
     DateTime? invoiceDate,
     String? ragId,
+    TransactionSyncStatus? syncStatus,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -108,6 +115,7 @@ class Transaction {
       invoiceId: invoiceId ?? this.invoiceId,
       invoiceDate: invoiceDate ?? this.invoiceDate,
       ragId: ragId ?? this.ragId,
+      syncStatus: syncStatus ?? this.syncStatus,
     );
   }
 

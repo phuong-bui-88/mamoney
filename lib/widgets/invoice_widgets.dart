@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mamoney/models/transaction_sync_status.dart';
 import 'package:mamoney/utils/currency_utils.dart';
 import 'package:mamoney/widgets/transaction_card_widget.dart';
 
@@ -8,11 +9,13 @@ class InvoiceGroup {
   final String invoiceId;
   final DateTime invoiceDate;
   final List<TransactionRecord> transactions;
+  final TransactionSyncStatus syncStatus;
 
   InvoiceGroup({
     required this.invoiceId,
     required this.invoiceDate,
     required this.transactions,
+    this.syncStatus = TransactionSyncStatus.synced,
   });
 
   double get totalAmount => transactions.fold(0, (sum, tx) => sum + tx.amount);

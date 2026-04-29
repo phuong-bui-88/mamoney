@@ -19,9 +19,15 @@ jobs:
       - name: Debug print GITHUB_TOKEN_API (masked)
         run: echo "TOKEN=${{ secrets.TOKEN_API }}"
 
+      - name: Disable code signing
+        run: |
+          sed -i "" 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i "" 's/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i "" 's/CODE_SIGNING_REQUIRED = [^;]*;/CODE_SIGNING_REQUIRED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i "" 's/CODE_SIGNING_ALLOWED = [^;]*;/CODE_SIGNING_ALLOWED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
+
       - run: pod repo update
         working-directory: ios
-
       
       - name: Build iOS with dart-define
         run: |

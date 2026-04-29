@@ -1,4 +1,5 @@
 import 'package:mamoney/models/transaction.dart';
+import 'package:mamoney/models/transaction_sync_status.dart';
 
 /// Represents a group of transactions imported from the same invoice
 class InvoiceGroup {
@@ -6,6 +7,7 @@ class InvoiceGroup {
   final String? imageUrl; // URL to the invoice image (same for all in group)
   final DateTime invoiceDate; // When the invoice was imported
   final List<Transaction> transactions; // All transactions in this group
+  final TransactionSyncStatus syncStatus;
 
   // Derived properties
   String? get vendorName => _extractVendorName();
@@ -21,6 +23,7 @@ class InvoiceGroup {
     required this.imageUrl,
     required this.invoiceDate,
     required this.transactions,
+    this.syncStatus = TransactionSyncStatus.synced,
   });
 
   /// Toggle expanded state

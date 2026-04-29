@@ -5,7 +5,7 @@ import 'package:mamoney/screens/transaction_list_screen.dart';
 import 'package:mamoney/screens/ask_screen.dart';
 import 'package:mamoney/services/auth_provider.dart';
 import 'package:mamoney/services/chat_provider.dart';
-import 'package:mamoney/services/connectivity_provider.dart';
+import 'package:mamoney/widgets/connectivity_indicator.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -51,40 +51,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       appBar: AppBar(
         title: const Text('MaMoney'),
         elevation: 0,
-        actions: [
-          Consumer<ConnectivityProvider>(
-            builder: (context, connectivityProvider, _) {
-              final isConnected = connectivityProvider.isConnected;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isConnected ? Icons.wifi : Icons.wifi_off,
-                        color: isConnected
-                            ? Colors.green
-                            : const Color.fromARGB(255, 211, 47, 47),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isConnected ? 'Connected' : 'No Internet',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isConnected
-                              ? Colors.green
-                              : const Color.fromARGB(255, 211, 47, 47),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+        actions: const [
+          ConnectivityIndicator(),
         ],
       ),
       body: _screens[_selectedIndex],

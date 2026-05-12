@@ -13,27 +13,26 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          architecture: x64
-      - run: flutter pub get
       
-      - name: Debug print GITHUB_TOKEN_API (masked)
-        run: echo "TOKEN=${{ secrets.TOKEN_API }}"
+      - name: Flutter Doctor
+        run: flutter doctor -v
 
-      - name: Disable code signing
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify TOKEN_API exists
         run: |
-          sed -i "" 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i "" 's/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i "" 's/CODE_SIGNING_REQUIRED = [^;]*;/CODE_SIGNING_REQUIRED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i "" 's/CODE_SIGNING_ALLOWED = [^;]*;/CODE_SIGNING_ALLOWED = NO;/g' ios/Runner.xcodeproj/project.pbxproj
-
-      - run: pod repo update
-        working-directory: ios
-      
+          if [ -z "${{ secrets.TOKEN_API }}" ]; then
+            echo "TOKEN_API missing"
+            exit 1
+          fi
+          
       - name: Build iOS with dart-define
         run: |
           flutter build ios \
             --release \
             --no-codesign \
+            --verbose \
             --dart-define=GITHUB_TOKEN=${{ secrets.TOKEN_API }}
 
       - run: mkdir Payload

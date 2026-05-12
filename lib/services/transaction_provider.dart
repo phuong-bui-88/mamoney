@@ -1,18 +1,26 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mamoney/models/transaction.dart';
+import 'package:mamoney/models/transaction_sync_status.dart';
 import 'package:mamoney/models/invoice_group.dart';
 import 'package:mamoney/models/invoice_preview_state.dart';
 import 'package:mamoney/services/firebase_service.dart';
+import 'package:mamoney/services/offline_queue_service.dart';
+import 'package:mamoney/services/connectivity_provider.dart';
+import 'package:mamoney/services/ai_service.dart';
 import 'package:mamoney/widgets/invoice_import_loading_overlay.dart';
+import 'package:mamoney/utils/category_constants.dart';
 import 'package:logging/logging.dart';
 
 final _logger = Logger('TransactionProvider');
 
 class TransactionProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
+  final OfflineQueueService _offlineQueueService = OfflineQueueService();
+  late ConnectivityProvider _connectivityProvider;
 
   List<Transaction> _transactions = [];
+  List<Transaction> _pendingTransactions = [];
   bool _isLoading = false;
   String? _error;
   StreamSubscription? _transactionSubscription;
@@ -34,6 +42,7 @@ class TransactionProvider extends ChangeNotifier {
   InvoicePreviewState? _previewState;
 
   List<Transaction> get transactions => _transactions;
+  List<Transaction> get pendingTransactions => _pendingTransactions;
   bool get isLoading => _isLoading;
   String? get error => _error;
   FilterType get filterType => _filterType;
@@ -91,6 +100,41 @@ class TransactionProvider extends ChangeNotifier {
 
   TransactionProvider() {
     _initializeTransactionStream();
+    _loadPendingTransactions();
+  }
+
+  /// Load pending transactions from offline queue on app startup
+  Future<void> _loadPendingTransactions() async {
+    try {
+      final pending = await _offlineQueueService.getPendingTransactions();
+      _pendingTransactions = pending;
+      _logger.info(
+          'Loaded ${pending.length} pending transactions from offline queue');
+      notifyListeners();
+    } catch (e) {
+      _logger.severe('Failed to load pending transactions: $e');
+    }
+  }
+
+  /// Set up listener for connectivity changes to trigger automatic sync
+  void setupConnectivityListener(ConnectivityProvider connectivityProvider) {
+    // Store reference for use in addTransaction
+    _connectivityProvider = connectivityProvider;
+
+    bool previousState = connectivityProvider.isConnected;
+
+    connectivityProvider.addListener(() {
+      final currentState = connectivityProvider.isConnected;
+
+      // If connectivity transitioned from offline to online
+      if (!previousState && currentState) {
+        _logger.info(
+            'Connectivity restored - triggering sync of pending transactions');
+        syncPendingTransactions();
+      }
+
+      previousState = currentState;
+    });
   }
 
   void _initializeTransactionStream() {
@@ -117,12 +161,45 @@ class TransactionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final id = await _firebaseService.addTransaction(transaction);
-      // Do NOT add optimistically - let the Firebase stream handle it
-      // This prevents duplicates from both manual add and stream listener
-      return id;
+      // Check if device is connected to internet (use stored connectivity provider)
+      final isConnected = _connectivityProvider.isConnected;
+      _logger.info(
+          'addTransaction: isConnected = $isConnected, description = ${transaction.description}');
+
+      if (!isConnected) {
+        // Device is offline - save to offline queue
+        _logger.info(
+            'Device offline - saving transaction to offline queue: ${transaction.description}');
+
+        // Generate a temporary ID for the transaction
+        final tempId = transaction.id.isEmpty
+            ? 'temp_${DateTime.now().millisecondsSinceEpoch}'
+            : transaction.id;
+
+        // Create transaction with pending status and temp ID
+        final pendingTransaction = transaction.copyWith(
+          id: tempId,
+          syncStatus: TransactionSyncStatus.pending,
+        );
+
+        // Add to pending list and queue
+        _pendingTransactions.add(pendingTransaction);
+        await _offlineQueueService.addPendingTransaction(pendingTransaction);
+
+        notifyListeners();
+        return tempId;
+      } else {
+        // Device is online - save to Firebase directly
+        _logger.info(
+            'Device online - saving transaction to Firebase: ${transaction.description}');
+        final id = await _firebaseService.addTransaction(transaction);
+        // Do NOT add optimistically - let the Firebase stream handle it
+        // This prevents duplicates from both manual add and stream listener
+        return id;
+      }
     } catch (e) {
       _error = e.toString();
+      _logger.severe('Error adding transaction: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -485,6 +562,179 @@ class TransactionProvider extends ChangeNotifier {
   void clearPreview() {
     _previewState = null;
     notifyListeners();
+  }
+
+  /// Sync all pending transactions to Firebase when connectivity is restored
+  Future<void> syncPendingTransactions() async {
+    if (_pendingTransactions.isEmpty) {
+      _logger.info('No pending transactions to sync');
+      return;
+    }
+
+    _logger.info(
+        'Starting sync of ${_pendingTransactions.length} pending transactions');
+
+    // Log details of each pending transaction
+    for (var i = 0; i < _pendingTransactions.length; i++) {
+      final t = _pendingTransactions[i];
+      _logger.info(
+          '[SYNC] Transaction $i: id=${t.id}, desc=${t.description}, amount=${t.amount}, userMessage=${t.userMessage}, syncStatus=${t.syncStatus}');
+    }
+
+    final List<String> succeededIds = [];
+    final List<String> failedIds = [];
+
+    // Process all pending transactions in parallel
+    await Future.wait(
+      _pendingTransactions.map((transaction) async {
+        try {
+          // Mark as syncing
+          var syncingTransaction = transaction.copyWith(
+            syncStatus: TransactionSyncStatus.syncing,
+          );
+
+          // Update the pending transaction in the list
+          var index =
+              _pendingTransactions.indexWhere((t) => t.id == transaction.id);
+          if (index >= 0) {
+            _pendingTransactions[index] = syncingTransaction;
+          }
+          notifyListeners();
+
+          // Check if transaction needs parsing (offline-saved with amount=0)
+          final needsParsing = transaction.amount == 0 &&
+              transaction.userMessage != null &&
+              transaction.userMessage!.isNotEmpty;
+
+          _logger.info(
+              '[SYNC] Transaction ${transaction.id}: needsParsing=$needsParsing, amount=${transaction.amount}, userMessage=${transaction.userMessage}');
+
+          if (needsParsing) {
+            _logger.info(
+                '[SYNC] Parsing unparsed transaction: ${transaction.userMessage}');
+
+            // Parse the user message with AI
+            final parseResult = await AIService.parseTransactionMessage(
+                transaction.userMessage!);
+
+            if (parseResult.containsKey('error')) {
+              _logger.warning(
+                  'Failed to parse transaction during sync: ${parseResult['error']}');
+              // Continue with original data if parsing fails
+              syncingTransaction = syncingTransaction.copyWith(
+                syncStatus: TransactionSyncStatus.synced,
+              );
+            } else {
+              // Extract parsed values
+              final description =
+                  parseResult['description'] ?? transaction.description;
+              final amountStr = parseResult['amount'] ?? '0';
+              final category = parseResult['category'] ?? transaction.category;
+              final type = parseResult['type'] ?? 'expense';
+              final ragId = parseResult['ragId'];
+
+              // Parse amount
+              final cleanAmount = AIService.cleanupAmount(amountStr.trim());
+              final parsedAmount = double.tryParse(cleanAmount) ?? 0;
+
+              // Determine type
+              final transactionType = type.toLowerCase() == 'income'
+                  ? TransactionType.income
+                  : TransactionType.expense;
+
+              // Validate and map category
+              final categories = transactionType == TransactionType.income
+                  ? CategoryConstants.incomeCategories
+                  : CategoryConstants.expenseCategories;
+
+              String validCategory = category;
+              if (!categories.contains(category)) {
+                final partialMatch = categories.firstWhere(
+                  (cat) => cat.toLowerCase().contains(category.toLowerCase()),
+                  orElse: () => categories.first,
+                );
+                validCategory = partialMatch;
+              }
+
+              // Update transaction with parsed values
+              syncingTransaction = syncingTransaction.copyWith(
+                description: description,
+                amount: parsedAmount,
+                category: validCategory,
+                type: transactionType,
+                ragId: ragId,
+                syncStatus: TransactionSyncStatus.synced,
+              );
+
+              _logger.info(
+                  'Parsed transaction: $description, amount: $parsedAmount, category: $validCategory');
+            }
+          } else {
+            syncingTransaction = syncingTransaction.copyWith(
+              syncStatus: TransactionSyncStatus.synced,
+            );
+          }
+
+          // Clear the temp ID before saving to Firebase so it generates a new one
+          final transactionToSync = syncingTransaction.copyWith(id: '');
+
+          _logger.info(
+              'Syncing transaction: ${transactionToSync.description}, amount: ${transactionToSync.amount}, userMessage: ${transactionToSync.userMessage}');
+
+          // Try to save to Firebase
+          final newId =
+              await _firebaseService.addTransaction(transactionToSync);
+
+          _logger.info(
+              'Successfully synced transaction: ${syncingTransaction.description} (new ID: $newId)');
+          succeededIds.add(transaction.id);
+
+          // Remove from pending queue
+          await _offlineQueueService.removePendingTransaction(transaction.id);
+        } catch (e) {
+          _logger.severe('Failed to sync transaction ${transaction.id}: $e');
+          failedIds.add(transaction.id);
+
+          // Mark transaction as failed (but keep in queue for retry)
+          final failedTransaction = transaction.copyWith(
+            syncStatus: TransactionSyncStatus.failed,
+          );
+          final index =
+              _pendingTransactions.indexWhere((t) => t.id == transaction.id);
+          if (index >= 0) {
+            _pendingTransactions[index] = failedTransaction;
+          }
+        }
+      }),
+      eagerError: false, // Continue syncing even if some fail
+    );
+
+    // Remove succeeded transactions from pending list
+    _pendingTransactions.removeWhere((t) => succeededIds.contains(t.id));
+
+    // Log results
+    _logger.info(
+        'Sync complete: ${succeededIds.length} succeeded, ${failedIds.length} failed');
+    notifyListeners();
+  }
+
+  /// Get sync status for a specific transaction
+  TransactionSyncStatus getTransactionSyncStatus(String transactionId) {
+    // Check pending transactions
+    for (final transaction in _pendingTransactions) {
+      if (transaction.id == transactionId) {
+        return transaction.syncStatus;
+      }
+    }
+
+    // Check synced transactions
+    for (final transaction in _transactions) {
+      if (transaction.id == transactionId) {
+        return transaction.syncStatus;
+      }
+    }
+
+    return TransactionSyncStatus.synced;
   }
 
   @override

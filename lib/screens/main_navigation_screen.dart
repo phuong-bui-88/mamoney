@@ -5,6 +5,7 @@ import 'package:mamoney/screens/transaction_list_screen.dart';
 import 'package:mamoney/screens/ask_screen.dart';
 import 'package:mamoney/services/auth_provider.dart';
 import 'package:mamoney/services/chat_provider.dart';
+import 'package:mamoney/widgets/connectivity_indicator.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -47,6 +48,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('MaMoney'),
+        elevation: 0,
+        actions: const [
+          ConnectivityIndicator(),
+        ],
+      ),
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,

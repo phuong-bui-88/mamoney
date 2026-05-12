@@ -7,6 +7,7 @@ import 'package:mamoney/services/ai_service.dart';
 import 'package:intl/intl.dart';
 import 'package:mamoney/utils/input_formatters.dart';
 import 'package:mamoney/utils/category_constants.dart';
+import 'package:mamoney/widgets/connectivity_indicator.dart';
 import 'package:logging/logging.dart';
 
 final _logger = Logger('EditTransactionScreen');
@@ -188,6 +189,9 @@ class _EditTransactionScreenState extends State<EditTransactionScreen> {
         title: const Text('Edit Transaction'),
         elevation: 0,
         centerTitle: false,
+        actions: const [
+          ConnectivityIndicator(),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(

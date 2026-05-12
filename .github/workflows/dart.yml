@@ -13,21 +13,26 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          architecture: x64
-      - run: flutter pub get
       
-      - name: Debug print GITHUB_TOKEN_API (masked)
-        run: echo "TOKEN=${{ secrets.TOKEN_API }}"
+      - name: Flutter Doctor
+        run: flutter doctor -v
 
-      - run: pod repo update
-        working-directory: ios
+      - name: Install dependencies
+        run: flutter pub get
 
-      
+      - name: Verify TOKEN_API exists
+        run: |
+          if [ -z "${{ secrets.TOKEN_API }}" ]; then
+            echo "TOKEN_API missing"
+            exit 1
+          fi
+          
       - name: Build iOS with dart-define
         run: |
           flutter build ios \
             --release \
             --no-codesign \
+            --verbose \
             --dart-define=GITHUB_TOKEN=${{ secrets.TOKEN_API }}
 
       - run: mkdir Payload
